@@ -1,0 +1,65 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Session {
+  id          String    @id
+  shop        String
+  state       String
+  isOnline    Boolean   @default(false)
+  scope       String?
+  expires     DateTime?
+  accessToken String
+  userId      BigInt?
+  
+  @@index([shop])
+}
+
+model Shop {
+  id                  String   @id @default(cuid())
+  shopDomain          String   @unique
+  accessToken         String
+  scope               String
+  installedAt         DateTime @default(now())
+  subscriptionStatus  String   @default("FREE")
+  planName            String?
+  bundles             Bundle[]
+  
+  @@index([shopDomain])
+}
+
+model Bundle {
+  id              String   @id @default(cuid())
+  shopId          String
+  shop            Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  title           String
+  description     String?
+  discountType    String
+  discountValue   Float
+  productIds      String[]
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  analytics       BundleAnalytics[]
+  
+  @@index([shopId])
+  @@index([active])
+}
+
+model BundleAnalytics {
+  id          String   @id @default(cuid())
+  bundleId    String
+  bundle      Bundle   @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+  views       Int      @default(0)
+  clicks      Int      @default(0)
+  conversions Int      @default(0)
+  revenue     Float    @default(0)
+  date        DateTime @default(now())
+  
+  @@index([bundleId, date])
+}
