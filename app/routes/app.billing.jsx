@@ -2,8 +2,8 @@ import { json } from "@remix-run/node";
 import { useLoaderData, useFetcher } from "@remix-run/react";
 import { Page, Layout, Card, Button, BlockStack, Text, Banner } from "@shopify/polaris";
 import { useEffect } from "react";
-import { authenticate } from "../shopify.server";
-import prisma from "../db.server";
+import { authenticate } from "~/shopify.server";
+import prisma from "~/db.server";
 
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);

@@ -10,8 +10,8 @@ import {
   InlineStack,
   Banner,
 } from "@shopify/polaris";
-import { authenticate } from "../shopify.server";
-import prisma from "../db.server";
+import { authenticate } from "~/shopify.server";
+import prisma from "~/db.server";
 
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
