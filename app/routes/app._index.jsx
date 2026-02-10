@@ -1,3 +1,4 @@
+import "@shopify/polaris/build/esm/styles.css";
 import { json } from "@remix-run/node";
 import { useLoaderData, useNavigate } from "@remix-run/react";
 import {
