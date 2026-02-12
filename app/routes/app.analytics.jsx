@@ -1,7 +1,14 @@
 import "@shopify/polaris/build/esm/styles.css";
 import { json } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
-import { Page, Layout, Card, Text, BlockStack } from "@shopify/polaris";
+import {
+  Page,
+  Layout,
+  Card,
+  Text,
+  BlockStack,
+  InlineGrid,
+} from "@shopify/polaris";
 
 export const loader = async ({ request }) => {
   return json({
@@ -20,20 +27,48 @@ export default function Analytics() {
     <Page title="Analytics" backAction={{ url: "/app" }}>
       <Layout>
         <Layout.Section>
-          <Card>
-            <BlockStack gap="400">
-              <Text as="h2" variant="headingMd">
-                Overall Performance
-              </Text>
+          <InlineGrid columns={4} gap="400">
+            <Card>
               <BlockStack gap="200">
-                <Text>Total Views: {totalViews}</Text>
-                <Text>Total Clicks: {totalClicks}</Text>
-                <Text>Total Conversions: {totalConversions}</Text>
-                <Text>Total Revenue: ${totalRevenue.toFixed(2)}</Text>
-                <Text>Conversion Rate: 0%</Text>
+                <Text as="h3" variant="headingSm" tone="subdued">
+                  Total Views
+                </Text>
+                <Text as="p" variant="headingXl">
+                  {totalViews}
+                </Text>
               </BlockStack>
-            </BlockStack>
-          </Card>
+            </Card>
+            <Card>
+              <BlockStack gap="200">
+                <Text as="h3" variant="headingSm" tone="subdued">
+                  Total Clicks
+                </Text>
+                <Text as="p" variant="headingXl">
+                  {totalClicks}
+                </Text>
+              </BlockStack>
+            </Card>
+            <Card>
+              <BlockStack gap="200">
+                <Text as="h3" variant="headingSm" tone="subdued">
+                  Conversions
+                </Text>
+                <Text as="p" variant="headingXl">
+                  {totalConversions}
+                </Text>
+              </BlockStack>
+            </Card>
+            <Card>
+              <BlockStack gap="200">
+                <Text as="h3" variant="headingSm" tone="subdued">
+                  Revenue
+                </Text>
+                <Text as="p" variant="headingXl">
+                  ${totalRevenue.toFixed(2)}
+                </Text>
+              </BlockStack>
+            </Card>
+          </InlineGrid>
         </Layout.Section>
 
         <Layout.Section>
@@ -42,7 +77,19 @@ export default function Analytics() {
               <Text as="h2" variant="headingMd">
                 Bundle Performance
               </Text>
-              <Text>No bundles created yet. Create your first bundle to start tracking performance!</Text>
+              {bundles.length === 0 ? (
+                <Text tone="subdued">
+                  No bundles created yet. Create your first bundle to start tracking performance!
+                </Text>
+              ) : (
+                bundles.map((bundle) => (
+                  <Card key={bundle.id}>
+                    <Text as="h3" variant="headingSm">
+                      {bundle.title}
+                    </Text>
+                  </Card>
+                ))
+              )}
             </BlockStack>
           </Card>
         </Layout.Section>

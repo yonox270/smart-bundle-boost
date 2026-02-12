@@ -1,12 +1,20 @@
 import "@shopify/polaris/build/esm/styles.css";
 import { json } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
-import { Page, Layout, Card, Button, BlockStack, Text, Banner } from "@shopify/polaris";
+import {
+  Page,
+  Layout,
+  Card,
+  Button,
+  BlockStack,
+  Text,
+  Banner,
+  List,
+} from "@shopify/polaris";
 
 export const loader = async ({ request }) => {
   return json({
     subscriptionStatus: "FREE",
-    planName: null,
   });
 };
 
@@ -18,38 +26,52 @@ export default function Billing() {
     <Page title="Billing" backAction={{ url: "/app" }}>
       <Layout>
         <Layout.Section>
-          <Banner tone="info">
-            <p>You're on the Free plan</p>
-          </Banner>
+          {isPremium ? (
+            <Banner tone="success">
+              <p>You're on the Premium plan! 🎉</p>
+            </Banner>
+          ) : (
+            <Banner tone="info">
+              <p>You're on the Free plan</p>
+            </Banner>
+          )}
         </Layout.Section>
 
         <Layout.Section>
           <Card>
-            <BlockStack gap="400">
-              <Text as="h2" variant="headingMd">
-                Current Plan: Free
-              </Text>
-
-              <BlockStack gap="200">
-                <Text as="h3" variant="headingSm">
-                  Free Plan
+            <BlockStack gap="500">
+              <BlockStack gap="300">
+                <Text as="h2" variant="headingMd">
+                  Free Plan (Current)
                 </Text>
-                <Text>✓ 1 bundle maximum</Text>
-                <Text>✓ Basic analytics</Text>
+                <List>
+                  <List.Item>1 bundle maximum</List.Item>
+                  <List.Item>Basic analytics</List.Item>
+                  <List.Item>Standard support</List.Item>
+                </List>
               </BlockStack>
 
-              <BlockStack gap="200">
-                <Text as="h3" variant="headingSm">
+              <BlockStack gap="300">
+                <Text as="h2" variant="headingMd">
                   Premium Plan - $9.99/month
                 </Text>
-                <Text>✓ Unlimited bundles</Text>
-                <Text>✓ Advanced analytics</Text>
-                <Text>✓ Priority support</Text>
+                <List>
+                  <List.Item>Unlimited bundles</List.Item>
+                  <List.Item>Advanced analytics</List.Item>
+                  <List.Item>Priority support</List.Item>
+                  <List.Item>Custom discount rules</List.Item>
+                </List>
               </BlockStack>
 
-              <Button variant="primary" onClick={() => alert("Billing coming soon!")}>
-                Upgrade to Premium
-              </Button>
+              {!isPremium && (
+                <Button
+                  variant="primary"
+                  size="large"
+                  onClick={() => alert("Billing integration coming soon!")}
+                >
+                  Upgrade to Premium - $9.99/month
+                </Button>
+              )}
             </BlockStack>
           </Card>
         </Layout.Section>

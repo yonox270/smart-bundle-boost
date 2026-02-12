@@ -1,6 +1,6 @@
 import "@shopify/polaris/build/esm/styles.css";
 import { json } from "@remix-run/node";
-import { useLoaderData, useNavigate } from "@remix-run/react";
+import { useLoaderData } from "@remix-run/react";
 import {
   Page,
   Layout,
@@ -13,7 +13,6 @@ import {
 } from "@shopify/polaris";
 
 export const loader = async ({ request }) => {
-  // SANS authenticate pour l'instant
   const url = new URL(request.url);
   const shop = url.searchParams.get("shop") || "demo-store.myshopify.com";
 
@@ -22,13 +21,11 @@ export const loader = async ({ request }) => {
     bundleCount: 0,
     isFreePlan: true,
     canCreateMoreBundles: true,
-    subscriptionStatus: "FREE",
   });
 };
 
 export default function Index() {
   const { shop, bundleCount, isFreePlan, canCreateMoreBundles } = useLoaderData();
-  const navigate = useNavigate();
 
   return (
     <Page title="Smart Bundle Boost">
@@ -37,7 +34,10 @@ export default function Index() {
           {isFreePlan && (
             <Banner
               title="You're on the Free plan"
-              action={{ content: "Upgrade to Premium", onAction: () => navigate("/app/billing") }}
+              action={{
+                content: "Upgrade to Premium",
+                url: "/app/billing",
+              }}
               tone="info"
             >
               <p>Create unlimited bundles for $9.99/month</p>
@@ -57,15 +57,19 @@ export default function Index() {
               <InlineStack gap="300">
                 <Button
                   variant="primary"
-                  onClick={() => navigate("/app/bundles")}
-                  disabled={!canCreateMoreBundles}
+                  url="/app/bundles"
                 >
                   Create Bundle
                 </Button>
-                <Button onClick={() => navigate("/app/analytics")}>
+                <Button url="/app/analytics">
                   View Analytics
                 </Button>
               </InlineStack>
+              {!canCreateMoreBundles && (
+                <Text tone="critical">
+                  Free plan limit reached. Upgrade to create more.
+                </Text>
+              )}
             </BlockStack>
           </Card>
         </Layout.Section>
