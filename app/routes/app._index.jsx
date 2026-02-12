@@ -11,11 +11,13 @@ import {
   InlineStack,
   Banner,
 } from "@shopify/polaris";
+import { authenticate } from "~/shopify.server";
 
 export const loader = async ({ request }) => {
-  // Version sans authenticate pour tester
+  const { session } = await authenticate.admin(request);
+
   return json({
-    shop: "test-shop.myshopify.com",
+    shop: session.shop,
     bundleCount: 0,
     isFreePlan: true,
     canCreateMoreBundles: true,
