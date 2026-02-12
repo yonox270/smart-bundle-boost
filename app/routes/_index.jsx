@@ -1,10 +1,13 @@
-import { redirect } from "@remix-run/node";
-
-export const loader = async () => {
-  // Si quelqu'un arrive sur /, redirige vers /app
-  return redirect("/app");
-};
-
 export default function Index() {
-  return null;
+  return (
+    <html>
+      <head>
+        <title>Smart Bundle Boost</title>
+        <meta httpEquiv="refresh" content="0; url=/app" />
+      </head>
+      <body>
+        <p>Redirecting to app...</p>
+      </body>
+    </html>
+  );
 }

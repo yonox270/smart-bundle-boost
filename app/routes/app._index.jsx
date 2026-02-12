@@ -11,13 +11,14 @@ import {
   InlineStack,
   Banner,
 } from "@shopify/polaris";
-import { authenticate } from "~/shopify.server";
 
 export const loader = async ({ request }) => {
-  const { session } = await authenticate.admin(request);
+  // SANS authenticate pour l'instant
+  const url = new URL(request.url);
+  const shop = url.searchParams.get("shop") || "demo-store.myshopify.com";
 
   return json({
-    shop: session.shop,
+    shop: shop,
     bundleCount: 0,
     isFreePlan: true,
     canCreateMoreBundles: true,
@@ -26,7 +27,7 @@ export const loader = async ({ request }) => {
 };
 
 export default function Index() {
-  const { shop, bundleCount, isFreePlan, canCreateMoreBundles, subscriptionStatus } = useLoaderData();
+  const { shop, bundleCount, isFreePlan, canCreateMoreBundles } = useLoaderData();
   const navigate = useNavigate();
 
   return (
@@ -65,11 +66,6 @@ export default function Index() {
                   View Analytics
                 </Button>
               </InlineStack>
-              {!canCreateMoreBundles && (
-                <Text tone="critical">
-                  Free plan limit reached (1 bundle max). Upgrade to create more.
-                </Text>
-              )}
             </BlockStack>
           </Card>
         </Layout.Section>
