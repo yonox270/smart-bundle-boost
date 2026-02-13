@@ -7,13 +7,12 @@ import {
   Card,
   Text,
   BlockStack,
-  Button,
-  TextField,
-  Select,
-  FormLayout,
-  IndexTable,
   Badge,
   Banner,
+  IndexTable,
+  Select,
+  TextField,
+  FormLayout,
 } from "@shopify/polaris";
 import { useState } from "react";
 import prisma from "~/db.server";
@@ -137,9 +136,9 @@ export default function Bundles() {
           <input type="hidden" name="bundleId" value={bundle.id} />
           <input type="hidden" name="currentActive" value={String(bundle.active)} />
           <input type="hidden" name="shop" value={shop} />
-          <Button submit variant="plain">
+          <button type="submit" style={{ background: "none", border: "none", cursor: "pointer", color: "#2c6ecb", fontSize: "14px" }}>
             {bundle.active ? "Deactivate" : "Activate"}
-          </Button>
+          </button>
         </Form>
       </IndexTable.Cell>
       <IndexTable.Cell>
@@ -147,7 +146,9 @@ export default function Bundles() {
           <input type="hidden" name="action" value="delete" />
           <input type="hidden" name="bundleId" value={bundle.id} />
           <input type="hidden" name="shop" value={shop} />
-          <Button submit variant="plain" tone="critical">Delete</Button>
+          <button type="submit" style={{ background: "none", border: "none", cursor: "pointer", color: "#d72c0d", fontSize: "14px" }}>
+            Delete
+          </button>
         </Form>
       </IndexTable.Cell>
     </IndexTable.Row>
@@ -175,9 +176,9 @@ export default function Bundles() {
           <Layout.Section>
             <Banner tone="warning">
               Free plan limit reached (1 bundle max).{" "}
-              <Button url="/app/billing" variant="plain">
+              <a href="/app/billing" style={{ color: "#2c6ecb" }}>
                 Upgrade to Premium
-              </Button>
+              </a>
             </Banner>
           </Layout.Section>
         )}
@@ -219,9 +220,21 @@ export default function Bundles() {
                       min="0"
                       max={discountType === "PERCENTAGE" ? "100" : undefined}
                     />
-                    <Button submit variant="primary">
+                    <button
+                      type="submit"
+                      style={{
+                        backgroundColor: "#008060",
+                        color: "white",
+                        border: "none",
+                        padding: "10px 20px",
+                        borderRadius: "6px",
+                        cursor: "pointer",
+                        fontSize: "14px",
+                        fontWeight: "600",
+                      }}
+                    >
                       Save Bundle
-                    </Button>
+                    </button>
                   </FormLayout>
                 </Form>
               </BlockStack>
