@@ -17,7 +17,7 @@ export const loader = async ({ request }) => {
   const shop = url.searchParams.get("shop") || "demo-store.myshopify.com";
 
   return json({
-    shop: shop,
+    shop,
     bundleCount: 0,
     isFreePlan: true,
     canCreateMoreBundles: true,
@@ -34,10 +34,7 @@ export default function Index() {
           {isFreePlan && (
             <Banner
               title="You're on the Free plan"
-              action={{
-                content: "Upgrade to Premium",
-                url: "/app/billing",
-              }}
+              action={{ content: "Upgrade to Premium", url: "/app/billing" }}
               tone="info"
             >
               <p>Create unlimited bundles for $9.99/month</p>
@@ -55,21 +52,13 @@ export default function Index() {
                 Increase your average order value by creating product bundles with automatic discounts.
               </Text>
               <InlineStack gap="300">
-                <Button
-                  variant="primary"
-                  url="/app/bundles"
-                >
+                <Button variant="primary" url="/app/bundles">
                   Create Bundle
                 </Button>
                 <Button url="/app/analytics">
                   View Analytics
                 </Button>
               </InlineStack>
-              {!canCreateMoreBundles && (
-                <Text tone="critical">
-                  Free plan limit reached. Upgrade to create more.
-                </Text>
-              )}
             </BlockStack>
           </Card>
         </Layout.Section>
@@ -77,9 +66,7 @@ export default function Index() {
         <Layout.Section>
           <Card>
             <BlockStack gap="200">
-              <Text as="h3" variant="headingSm">
-                Quick Stats
-              </Text>
+              <Text as="h3" variant="headingSm">Quick Stats</Text>
               <Text>Active Bundles: {bundleCount}</Text>
               <Text>Plan: {isFreePlan ? "Free" : "Premium"}</Text>
               <Text>Shop: {shop}</Text>
