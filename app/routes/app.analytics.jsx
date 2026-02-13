@@ -8,20 +8,75 @@ import {
   Text,
   BlockStack,
   InlineGrid,
+  DataTable,
 } from "@shopify/polaris";
+import prisma from "~/db.server";
 
 export const loader = async ({ request }) => {
+  const url = new URL(request.url);
+  const shop = url.searchParams.get("shop") || "demo-store.myshopify.com";
+
+  const shopData = await prisma.shop.findUnique({
+    where: { shopDomain: shop },
+    include: {
+      bundles: {
+        include: {
+          analytics: true,
+        },
+      },
+    },
+  });
+
+  let totalViews = 0;
+  let totalClicks = 0;
+  let totalConversions = 0;
+  let totalRevenue = 0;
+
+  const bundleStats = shopData?.bundles.map((bundle) => {
+    const views = bundle.analytics.reduce((s, a) => s + a.views, 0);
+    const clicks = bundle.analytics.reduce((s, a) => s + a.clicks, 0);
+    const conversions = bundle.analytics.reduce((s, a) => s + a.conversions, 0);
+    const revenue = bundle.analytics.reduce((s, a) => s + a.revenue, 0);
+    const conversionRate = views > 0 ? ((conversions / views) * 100).toFixed(1) : "0.0";
+
+    totalViews += views;
+    totalClicks += clicks;
+    totalConversions += conversions;
+    totalRevenue += revenue;
+
+    return {
+      id: bundle.id,
+      title: bundle.title,
+      active: bundle.active,
+      views,
+      clicks,
+      conversions,
+      revenue,
+      conversionRate,
+    };
+  }) || [];
+
   return json({
-    totalViews: 0,
-    totalClicks: 0,
-    totalConversions: 0,
-    totalRevenue: 0,
-    bundles: [],
+    totalViews,
+    totalClicks,
+    totalConversions,
+    totalRevenue,
+    bundleStats,
   });
 };
 
 export default function Analytics() {
-  const { totalViews, totalClicks, totalConversions, totalRevenue, bundles } = useLoaderData();
+  const { totalViews, totalClicks, totalConversions, totalRevenue, bundleStats } = useLoaderData();
+
+  const rows = bundleStats.map((bundle) => [
+    bundle.title,
+    bundle.active ? "✅ Active" : "⏸ Inactive",
+    bundle.views.toString(),
+    bundle.clicks.toString(),
+    bundle.conversions.toString(),
+    `${bundle.conversionRate}%`,
+    `$${bundle.revenue.toFixed(2)}`,
+  ]);
 
   return (
     <Page title="Analytics" backAction={{ url: "/app" }}>
@@ -77,18 +132,33 @@ export default function Analytics() {
               <Text as="h2" variant="headingMd">
                 Bundle Performance
               </Text>
-              {bundles.length === 0 ? (
+              {bundleStats.length === 0 ? (
                 <Text tone="subdued">
-                  No bundles created yet. Create your first bundle to start tracking performance!
+                  No bundles yet. Create your first bundle to start tracking performance!
                 </Text>
               ) : (
-                bundles.map((bundle) => (
-                  <Card key={bundle.id}>
-                    <Text as="h3" variant="headingSm">
-                      {bundle.title}
-                    </Text>
-                  </Card>
-                ))
+                <DataTable
+                  columnContentTypes={[
+                    "text",
+                    "text",
+                    "numeric",
+                    "numeric",
+                    "numeric",
+                    "numeric",
+                    "numeric",
+                  ]}
+                  headings={[
+                    "Bundle",
+                    "Status",
+                    "Views",
+                    "Clicks",
+                    "Conversions",
+                    "Conv. Rate",
+                    "Revenue",
+                  ]}
+                  rows={rows}
+                  footerContent={`${bundleStats.length} bundle${bundleStats.length > 1 ? "s" : ""} total`}
+                />
               )}
             </BlockStack>
           </Card>
