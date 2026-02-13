@@ -5,11 +5,7 @@ import {
   shopifyApp,
   LATEST_API_VERSION,
 } from "@shopify/shopify-app-remix/server";
-import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
-import { restResources } from "@shopify/shopify-api/rest/admin/2024-01";
-import prisma from "./db.server";
-
-const prismaSessionStorage = new PrismaSessionStorage(prisma);
+import { MemorySessionStorage } from "@shopify/shopify-api";
 
 const shopify = shopifyApp({
   apiKey: process.env.SHOPIFY_API_KEY,
@@ -18,9 +14,8 @@ const shopify = shopifyApp({
   scopes: process.env.SCOPES?.split(","),
   appUrl: process.env.SHOPIFY_APP_URL || "",
   authPathPrefix: "/auth",
-  sessionStorage: prismaSessionStorage,
+  sessionStorage: new MemorySessionStorage(),
   distribution: AppDistribution.AppStore,
-  restResources,
   webhooks: {
     CUSTOMERS_DATA_REQUEST: {
       deliveryMethod: DeliveryMethod.Http,
@@ -43,24 +38,6 @@ const shopify = shopifyApp({
     afterAuth: async ({ session }) => {
       shopify.registerWebhooks({ session });
       console.log(`✅ Shop ${session.shop} installed`);
-
-      try {
-        await prisma.shop.upsert({
-          where: { shopDomain: session.shop },
-          update: {
-            accessToken: session.accessToken,
-            scope: session.scope || "",
-          },
-          create: {
-            shopDomain: session.shop,
-            accessToken: session.accessToken,
-            scope: session.scope || "",
-          },
-        });
-        console.log(`✅ Shop saved to database`);
-      } catch (error) {
-        console.error("❌ Error saving shop:", error);
-      }
     },
   },
   future: {
@@ -76,4 +53,3 @@ export const authenticate = shopify.authenticate;
 export const unauthenticated = shopify.unauthenticated;
 export const login = shopify.login;
 export const registerWebhooks = shopify.registerWebhooks;
-export const sessionStorage = prismaSessionStorage;
