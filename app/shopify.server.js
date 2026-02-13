@@ -37,7 +37,7 @@ const shopify = shopifyApp({
   hooks: {
     afterAuth: async ({ session }) => {
       shopify.registerWebhooks({ session });
-      console.log(`✅ Shop ${session.shop} installed`);
+      console.log(`Shop ${session.shop} installed`);
     },
   },
   future: {
