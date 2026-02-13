@@ -47,10 +47,9 @@ export const loader = async ({ request }) => {
 };
 
 export const action = async ({ request }) => {
-  const url = new URL(request.url);
-  const shop = url.searchParams.get("shop") || "demo-store.myshopify.com";
   const formData = await request.formData();
   const actionType = formData.get("action");
+  const shop = formData.get("shop") || new URL(request.url).searchParams.get("shop") || "demo-store.myshopify.com";
 
   let shopData = await prisma.shop.findUnique({
     where: { shopDomain: shop },
@@ -133,19 +132,21 @@ export default function Bundles() {
         </Badge>
       </IndexTable.Cell>
       <IndexTable.Cell>
-        <Form method="post" action={`/app/bundles?shop=${shop}`}>
+        <Form method="post">
           <input type="hidden" name="action" value="toggle" />
           <input type="hidden" name="bundleId" value={bundle.id} />
           <input type="hidden" name="currentActive" value={String(bundle.active)} />
+          <input type="hidden" name="shop" value={shop} />
           <Button submit variant="plain">
             {bundle.active ? "Deactivate" : "Activate"}
           </Button>
         </Form>
       </IndexTable.Cell>
       <IndexTable.Cell>
-        <Form method="post" action={`/app/bundles?shop=${shop}`}>
+        <Form method="post">
           <input type="hidden" name="action" value="delete" />
           <input type="hidden" name="bundleId" value={bundle.id} />
+          <input type="hidden" name="shop" value={shop} />
           <Button submit variant="plain" tone="critical">Delete</Button>
         </Form>
       </IndexTable.Cell>
@@ -186,8 +187,9 @@ export default function Bundles() {
             <Card>
               <BlockStack gap="400">
                 <Text as="h2" variant="headingMd">Create New Bundle</Text>
-                <Form method="post" action={`/app/bundles?shop=${shop}`}>
+                <Form method="post">
                   <input type="hidden" name="action" value="create" />
+                  <input type="hidden" name="shop" value={shop} />
                   <FormLayout>
                     <TextField
                       label="Bundle Title"
