@@ -14,7 +14,7 @@ import {
   TextField,
   FormLayout,
 } from "@shopify/polaris";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import prisma from "~/db.server";
 
 const API_URL = "https://smart-bundle-boost-eight.vercel.app/api/bundles";
@@ -60,11 +60,14 @@ export default function Bundles() {
   const [discountValue, setDiscountValue] = useState("10");
   const [loading, setLoading] = useState(false);
   const [localBundles, setLocalBundles] = useState(bundles);
+  const titleRef = useRef("");
 
   const canCreate = !isFreePlan || bundleCount < 1;
 
   const handleCreate = async () => {
-    if (!title) {
+    const currentTitle = titleRef.current;
+    alert("Title actuel: '" + currentTitle + "'");
+    if (!currentTitle || currentTitle.trim() === "") {
       alert("Titre vide !");
       return;
     }
@@ -76,7 +79,7 @@ export default function Bundles() {
         body: new URLSearchParams({
           action: "create",
           shop: shop,
-          title: title,
+          title: currentTitle,
           discountType: discountType,
           discountValue: discountValue,
         }),
@@ -87,6 +90,7 @@ export default function Bundles() {
       if (data.success) {
         setShowForm(false);
         setTitle("");
+        titleRef.current = "";
         setDiscountValue("10");
         window.location.reload();
       }
@@ -195,6 +199,7 @@ export default function Bundles() {
               onAction: () => {
                 setShowForm(!showForm);
                 setTitle("");
+                titleRef.current = "";
                 setDiscountValue("10");
               },
             }
@@ -222,7 +227,10 @@ export default function Bundles() {
                   <TextField
                     label="Bundle Title"
                     value={title}
-                    onChange={setTitle}
+                    onChange={(val) => {
+                      setTitle(val);
+                      titleRef.current = val;
+                    }}
                     autoComplete="off"
                     placeholder="e.g., Summer Bundle"
                   />
