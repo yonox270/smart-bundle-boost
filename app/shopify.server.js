@@ -59,9 +59,10 @@ const shopify = shopifyApp({
     },
   },
   future: {
-    v3_webhookAdminContext: true,
-    v3_authenticatePublic: true,
-  },
+  v3_webhookAdminContext: true,
+  v3_authenticatePublic: true,
+  unstable_newEmbeddedAuthStrategy: true,
+},
 });
 
 export default shopify;
