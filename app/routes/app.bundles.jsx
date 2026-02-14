@@ -11,10 +11,9 @@ import {
   Banner,
   IndexTable,
   Select,
-  TextField,
   FormLayout,
 } from "@shopify/polaris";
-import { useState, useRef } from "react";
+import { useState } from "react";
 import prisma from "~/db.server";
 
 const API_URL = "https://smart-bundle-boost-eight.vercel.app/api/bundles";
@@ -55,24 +54,26 @@ export const loader = async ({ request }) => {
 export default function Bundles() {
   const { bundles, isFreePlan, bundleCount, shop } = useLoaderData();
   const [showForm, setShowForm] = useState(false);
-  const [title, setTitle] = useState("");
   const [discountType, setDiscountType] = useState("PERCENTAGE");
-  const [discountValue, setDiscountValue] = useState("10");
   const [loading, setLoading] = useState(false);
   const [localBundles, setLocalBundles] = useState(bundles);
-  const titleRef = useRef("");
 
   const canCreate = !isFreePlan || bundleCount < 1;
 
   const handleCreate = async () => {
-    const currentTitle = titleRef.current;
-    alert("Title actuel: '" + currentTitle + "'");
-    if (!currentTitle || currentTitle.trim() === "") {
+    const titleEl = document.getElementById("bundleTitle");
+    const discountValueEl = document.getElementById("bundleDiscountValue");
+    const currentTitle = titleEl ? titleEl.value : "";
+    const currentDiscountValue = discountValueEl ? discountValueEl.value : "10";
+
+    alert("Title: '" + currentTitle + "'");
+
+    if (!currentTitle.trim()) {
       alert("Titre vide !");
       return;
     }
+
     setLoading(true);
-    alert("Envoi vers: " + API_URL + " | shop: " + shop);
     try {
       const response = await fetch(API_URL, {
         method: "POST",
@@ -81,21 +82,18 @@ export default function Bundles() {
           shop: shop,
           title: currentTitle,
           discountType: discountType,
-          discountValue: discountValue,
+          discountValue: currentDiscountValue,
         }),
       });
-      alert("Status reçu: " + response.status);
+      alert("Status: " + response.status);
       const data = await response.json();
       alert("Réponse: " + JSON.stringify(data));
       if (data.success) {
         setShowForm(false);
-        setTitle("");
-        titleRef.current = "";
-        setDiscountValue("10");
         window.location.reload();
       }
     } catch (e) {
-      alert("ERREUR CATCH: " + e.message);
+      alert("ERREUR: " + e.message);
     } finally {
       setLoading(false);
     }
@@ -196,12 +194,7 @@ export default function Bundles() {
         canCreate
           ? {
               content: showForm ? "Cancel" : "New Bundle",
-              onAction: () => {
-                setShowForm(!showForm);
-                setTitle("");
-                titleRef.current = "";
-                setDiscountValue("10");
-              },
+              onAction: () => setShowForm(!showForm),
             }
           : undefined
       }
@@ -224,16 +217,25 @@ export default function Bundles() {
               <BlockStack gap="400">
                 <Text as="h2" variant="headingMd">Create New Bundle</Text>
                 <FormLayout>
-                  <TextField
-                    label="Bundle Title"
-                    value={title}
-                    onChange={(val) => {
-                      setTitle(val);
-                      titleRef.current = val;
-                    }}
-                    autoComplete="off"
-                    placeholder="e.g., Summer Bundle"
-                  />
+                  <div>
+                    <label style={{ display: "block", marginBottom: "4px", fontSize: "14px", fontWeight: "500" }}>
+                      Bundle Title
+                    </label>
+                    <input
+                      id="bundleTitle"
+                      type="text"
+                      placeholder="e.g., Summer Bundle"
+                      style={{
+                        width: "100%",
+                        padding: "8px 12px",
+                        borderRadius: "6px",
+                        border: "1px solid #ccc",
+                        fontSize: "14px",
+                        boxSizing: "border-box",
+                      }}
+                    />
+                  </div>
+
                   <Select
                     label="Discount Type"
                     options={[
@@ -243,19 +245,28 @@ export default function Bundles() {
                     value={discountType}
                     onChange={setDiscountType}
                   />
-                  <TextField
-                    label={
-                      discountType === "PERCENTAGE"
-                        ? "Discount %"
-                        : "Discount Amount $"
-                    }
-                    value={discountValue}
-                    onChange={setDiscountValue}
-                    type="number"
-                    autoComplete="off"
-                    min="0"
-                    max={discountType === "PERCENTAGE" ? "100" : undefined}
-                  />
+
+                  <div>
+                    <label style={{ display: "block", marginBottom: "4px", fontSize: "14px", fontWeight: "500" }}>
+                      {discountType === "PERCENTAGE" ? "Discount %" : "Discount Amount $"}
+                    </label>
+                    <input
+                      id="bundleDiscountValue"
+                      type="number"
+                      defaultValue="10"
+                      min="0"
+                      max={discountType === "PERCENTAGE" ? "100" : undefined}
+                      style={{
+                        width: "100%",
+                        padding: "8px 12px",
+                        borderRadius: "6px",
+                        border: "1px solid #ccc",
+                        fontSize: "14px",
+                        boxSizing: "border-box",
+                      }}
+                    />
+                  </div>
+
                   <button
                     onClick={handleCreate}
                     disabled={loading}
