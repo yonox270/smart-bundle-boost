@@ -10,13 +10,9 @@ import {
   Badge,
   Banner,
   IndexTable,
-  Select,
-  FormLayout,
 } from "@shopify/polaris";
-import { useState, useRef, useCallback } from "react";
+import { useState } from "react";
 import prisma from "~/db.server";
-
-const API_URL = "https://smart-bundle-boost-eight.vercel.app/api/bundles";
 
 const getShop = (request) => {
   const url = new URL(request.url);
@@ -51,97 +47,123 @@ export const loader = async ({ request }) => {
   });
 };
 
-export default function Bundles() {
-  const { bundles, isFreePlan, bundleCount, shop } = useLoaderData();
-  const [showForm, setShowForm] = useState(false);
-  const [discountType, setDiscountType] = useState("PERCENTAGE");
-  const [loading, setLoading] = useState(false);
-  const [localBundles, setLocalBundles] = useState(bundles);
-  
-  const titleRef = useRef(null);
-  const discountValueRef = useRef(null);
+export const action = async ({ request }) => {
+  const formData = await request.formData();
+  const actionType = formData.get("action");
+  const shop = formData.get("shop") || "bundle-test-20220534.myshopify.com";
 
+  let shopData = await prisma.shop.findUnique({
+    where: { shopDomain: shop },
+    include: { bundles: true },
+  });
+
+  if (!shopData) {
+    shopData = await prisma.shop.create({
+      data: { shopDomain: shop, accessToken: "", scope: "" },
+      include: { bundles: true },
+    });
+  }
+
+  if (actionType === "create") {
+    const title = formData.get("title");
+    const discountType = formData.get("discountType");
+    const discountValue = parseFloat(formData.get("discountValue"));
+    await prisma.bundle.create({
+      data: {
+        shopId: shopData.id,
+        title,
+        discountType,
+        discountValue,
+        productIds: [],
+      },
+    });
+  }
+
+  if (actionType === "delete") {
+    await prisma.bundle.delete({ where: { id: formData.get("bundleId") } });
+  }
+
+  if (actionType === "toggle") {
+    const currentActive = formData.get("currentActive") === "true";
+    await prisma.bundle.update({
+      where: { id: formData.get("bundleId") },
+      data: { active: !currentActive },
+    });
+  }
+
+  // Recharge les bundles
+  const updated = await prisma.shop.findUnique({
+    where: { shopDomain: shop },
+    include: { bundles: { orderBy: { createdAt: "desc" } } },
+  });
+
+  return json({
+    bundles: updated?.bundles || [],
+    isFreePlan: updated?.subscriptionStatus === "FREE" || !updated?.subscriptionStatus,
+    bundleCount: updated?.bundles?.length || 0,
+    shop,
+    success: true,
+  });
+};
+
+export default function Bundles() {
+  const loaderData = useLoaderData();
+  const [data, setData] = useState(loaderData);
+  const [showForm, setShowForm] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const { bundles, isFreePlan, bundleCount, shop } = data;
   const canCreate = !isFreePlan || bundleCount < 1;
 
-  const handleCreate = async () => {
-    const currentTitle = titleRef.current ? titleRef.current.value : "";
-    const currentDiscountValue = discountValueRef.current ? discountValueRef.current.value : "10";
-
-    alert("Title: '" + currentTitle + "' | Shop: '" + shop + "'");
-
-    if (!currentTitle.trim()) {
-      alert("Titre vide !");
-      return;
-    }
-
+  const submitAction = async (formData) => {
     setLoading(true);
     try {
-      const response = await fetch(API_URL, {
+      const response = await fetch(window.location.href, {
         method: "POST",
-        body: new URLSearchParams({
-          action: "create",
-          shop: shop,
-          title: currentTitle,
-          discountType: discountType,
-          discountValue: currentDiscountValue,
-        }),
+        body: formData,
       });
-      alert("Status: " + response.status);
-      const data = await response.json();
-      alert("Réponse: " + JSON.stringify(data));
-      if (data.success) {
+      const result = await response.json();
+      if (result.success) {
+        setData(result);
         setShowForm(false);
-        window.location.reload();
       }
     } catch (e) {
-      alert("ERREUR: " + e.message);
+      alert("Erreur: " + e.message);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCreate = async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const formData = new FormData(form);
+    formData.append("action", "create");
+    formData.append("shop", shop);
+    await submitAction(formData);
+    form.reset();
   };
 
   const handleDelete = async (bundleId) => {
-    setLoading(true);
-    try {
-      await fetch(API_URL, {
-        method: "POST",
-        body: new URLSearchParams({
-          action: "delete",
-          shop: shop,
-          bundleId: bundleId,
-        }),
-      });
-      window.location.reload();
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
+    const formData = new FormData();
+    formData.append("action", "delete");
+    formData.append("shop", shop);
+    formData.append("bundleId", bundleId);
+    await submitAction(formData);
   };
 
   const handleToggle = async (bundleId, currentActive) => {
-    setLoading(true);
-    try {
-      await fetch(API_URL, {
-        method: "POST",
-        body: new URLSearchParams({
-          action: "toggle",
-          shop: shop,
-          bundleId: bundleId,
-          currentActive: String(currentActive),
-        }),
-      });
-      window.location.reload();
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
+    const formData = new FormData();
+    formData.append("action", "toggle");
+    formData.append("shop", shop);
+    formData.append("bundleId", bundleId);
+    formData.append("currentActive", String(currentActive));
+    await submitAction(formData);
   };
 
   const resourceName = { singular: "bundle", plural: "bundles" };
 
-  const rowMarkup = localBundles.map((bundle, index) => (
+  const rowMarkup = bundles.map((bundle, index) => (
     <IndexTable.Row id={bundle.id} key={bundle.id} position={index}>
       <IndexTable.Cell>
         <Text variant="bodyMd" fontWeight="bold">{bundle.title}</Text>
@@ -159,13 +181,7 @@ export default function Bundles() {
       <IndexTable.Cell>
         <button
           onClick={() => handleToggle(bundle.id, bundle.active)}
-          style={{
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            color: "#2c6ecb",
-            fontSize: "14px",
-          }}
+          style={{ background: "none", border: "none", cursor: "pointer", color: "#2c6ecb", fontSize: "14px" }}
         >
           {bundle.active ? "Deactivate" : "Activate"}
         </button>
@@ -173,13 +189,7 @@ export default function Bundles() {
       <IndexTable.Cell>
         <button
           onClick={() => handleDelete(bundle.id)}
-          style={{
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            color: "#d72c0d",
-            fontSize: "14px",
-          }}
+          style={{ background: "none", border: "none", cursor: "pointer", color: "#d72c0d", fontSize: "14px" }}
         >
           Delete
         </button>
@@ -193,10 +203,7 @@ export default function Bundles() {
       backAction={{ url: "/app" }}
       primaryAction={
         canCreate
-          ? {
-              content: showForm ? "Cancel" : "New Bundle",
-              onAction: () => setShowForm(!showForm),
-            }
+          ? { content: showForm ? "Cancel" : "New Bundle", onAction: () => setShowForm(!showForm) }
           : undefined
       }
     >
@@ -205,9 +212,7 @@ export default function Bundles() {
           <Layout.Section>
             <Banner tone="warning">
               Free plan limit reached (1 bundle max).{" "}
-              <a href="/app/billing" style={{ color: "#2c6ecb" }}>
-                Upgrade to Premium
-              </a>
+              <a href="/app/billing" style={{ color: "#2c6ecb" }}>Upgrade to Premium</a>
             </Banner>
           </Layout.Section>
         )}
@@ -217,74 +222,86 @@ export default function Bundles() {
             <Card>
               <BlockStack gap="400">
                 <Text as="h2" variant="headingMd">Create New Bundle</Text>
-                <FormLayout>
-                  <div>
-                    <label style={{ display: "block", marginBottom: "4px", fontSize: "14px", fontWeight: "500" }}>
-                      Bundle Title
-                    </label>
-                    <input
-                      ref={titleRef}
-                      type="text"
-                      placeholder="e.g., Summer Bundle"
+                <form onSubmit={handleCreate}>
+                  <BlockStack gap="300">
+                    <div>
+                      <label style={{ display: "block", marginBottom: "4px", fontSize: "14px", fontWeight: "500" }}>
+                        Bundle Title
+                      </label>
+                      <input
+                        name="title"
+                        type="text"
+                        required
+                        placeholder="e.g., Summer Bundle"
+                        style={{
+                          width: "100%",
+                          padding: "8px 12px",
+                          borderRadius: "6px",
+                          border: "1px solid #ccc",
+                          fontSize: "14px",
+                          boxSizing: "border-box",
+                        }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: "block", marginBottom: "4px", fontSize: "14px", fontWeight: "500" }}>
+                        Discount Type
+                      </label>
+                      <select
+                        name="discountType"
+                        style={{
+                          width: "100%",
+                          padding: "8px 12px",
+                          borderRadius: "6px",
+                          border: "1px solid #ccc",
+                          fontSize: "14px",
+                          boxSizing: "border-box",
+                        }}
+                      >
+                        <option value="PERCENTAGE">Percentage (%)</option>
+                        <option value="FIXED_AMOUNT">Fixed Amount ($)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={{ display: "block", marginBottom: "4px", fontSize: "14px", fontWeight: "500" }}>
+                        Discount Value
+                      </label>
+                      <input
+                        name="discountValue"
+                        type="number"
+                        defaultValue="10"
+                        min="0"
+                        style={{
+                          width: "100%",
+                          padding: "8px 12px",
+                          borderRadius: "6px",
+                          border: "1px solid #ccc",
+                          fontSize: "14px",
+                          boxSizing: "border-box",
+                        }}
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={loading}
                       style={{
-                        width: "100%",
-                        padding: "8px 12px",
+                        backgroundColor: loading ? "#ccc" : "#008060",
+                        color: "white",
+                        border: "none",
+                        padding: "10px 20px",
                         borderRadius: "6px",
-                        border: "1px solid #ccc",
+                        cursor: loading ? "not-allowed" : "pointer",
                         fontSize: "14px",
-                        boxSizing: "border-box",
+                        fontWeight: "600",
                       }}
-                    />
-                  </div>
-
-                  <Select
-                    label="Discount Type"
-                    options={[
-                      { label: "Percentage (%)", value: "PERCENTAGE" },
-                      { label: "Fixed Amount ($)", value: "FIXED_AMOUNT" },
-                    ]}
-                    value={discountType}
-                    onChange={setDiscountType}
-                  />
-
-                  <div>
-                    <label style={{ display: "block", marginBottom: "4px", fontSize: "14px", fontWeight: "500" }}>
-                      {discountType === "PERCENTAGE" ? "Discount %" : "Discount Amount $"}
-                    </label>
-                    <input
-                      ref={discountValueRef}
-                      type="number"
-                      defaultValue="10"
-                      min="0"
-                      max={discountType === "PERCENTAGE" ? "100" : undefined}
-                      style={{
-                        width: "100%",
-                        padding: "8px 12px",
-                        borderRadius: "6px",
-                        border: "1px solid #ccc",
-                        fontSize: "14px",
-                        boxSizing: "border-box",
-                      }}
-                    />
-                  </div>
-
-                  <button
-                    onClick={handleCreate}
-                    disabled={loading}
-                    style={{
-                      backgroundColor: loading ? "#ccc" : "#008060",
-                      color: "white",
-                      border: "none",
-                      padding: "10px 20px",
-                      borderRadius: "6px",
-                      cursor: loading ? "not-allowed" : "pointer",
-                      fontSize: "14px",
-                      fontWeight: "600",
-                    }}
-                  >
-                    {loading ? "Saving..." : "Save Bundle"}
-                  </button>
-                </FormLayout>
+                    >
+                      {loading ? "Saving..." : "Save Bundle"}
+                    </button>
+                  </BlockStack>
+                </form>
               </BlockStack>
             </Card>
           </Layout.Section>
@@ -294,7 +311,7 @@ export default function Bundles() {
           <Card padding="0">
             <IndexTable
               resourceName={resourceName}
-              itemCount={localBundles.length}
+              itemCount={bundles.length}
               headings={[
                 { title: "Title" },
                 { title: "Discount" },
@@ -305,9 +322,7 @@ export default function Bundles() {
               selectable={false}
               emptyState={
                 <div style={{ padding: "2rem", textAlign: "center" }}>
-                  <Text tone="subdued">
-                    No bundles yet. Click "New Bundle" to create your first one!
-                  </Text>
+                  <Text tone="subdued">No bundles yet. Click "New Bundle" to create your first one!</Text>
                 </div>
               }
             >
