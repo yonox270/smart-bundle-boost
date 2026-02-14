@@ -1,0 +1,35 @@
+name = "storescore"
+client_id = "45daa57330c4d8e66c686f38e0425279"
+application_url = "https://smart-bundle-boost-eight.vercel.app"
+embedded = true
+
+[build]
+automatically_update_urls_on_dev = true
+dev_store_url = "bundle-test-20220534.myshopify.com"
+
+[access_scopes]
+scopes = "read_products,read_orders,read_content,read_themes"
+
+[auth]
+redirect_urls = [
+  "https://smart-bundle-boost-eight.vercel.app/auth/callback",
+  "https://smart-bundle-boost-eight.vercel.app/auth/shopify/callback"
+]
+
+[webhooks]
+api_version = "2024-01"
+
+[[webhooks.subscriptions]]
+topics = ["customers/data_request"]
+uri = "/webhooks/gdpr/customers-data-request"
+
+[[webhooks.subscriptions]]
+topics = ["customers/redact"]
+uri = "/webhooks/gdpr/customers-redact"
+
+[[webhooks.subscriptions]]
+topics = ["shop/redact"]
+uri = "/webhooks/gdpr/shop-redact"
+
+[pos]
+embedded = false
