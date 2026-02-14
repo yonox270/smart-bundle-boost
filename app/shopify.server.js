@@ -38,7 +38,7 @@ const shopify = shopifyApp({
   hooks: {
     afterAuth: async ({ session }) => {
       shopify.registerWebhooks({ session });
-      console.log(`Shop ${session.shop} installed`);
+      console.log(`Shop ${session.shop} installed, token: ${session.accessToken ? "present" : "missing"}`);
       try {
         await prisma.shop.upsert({
           where: { shopDomain: session.shop },
@@ -52,17 +52,17 @@ const shopify = shopifyApp({
             scope: session.scope || "",
           },
         });
-        console.log(`Shop ${session.shop} saved to DB`);
+        console.log(`Shop ${session.shop} saved with token`);
       } catch (error) {
         console.error("Error saving shop:", error);
       }
     },
   },
   future: {
-  v3_webhookAdminContext: true,
-  v3_authenticatePublic: true,
-  unstable_newEmbeddedAuthStrategy: true,
-},
+    v3_webhookAdminContext: true,
+    v3_authenticatePublic: true,
+    unstable_newEmbeddedAuthStrategy: true,
+  },
 });
 
 export default shopify;
