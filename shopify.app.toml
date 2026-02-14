@@ -1,19 +1,19 @@
 name = "smart-bundle-boost"
-client_id = ""
-application_url = "https://your-app.oxygen.dev"
+client_id = "2a1aa0d9b96c76a1fff1dcac830b8b4b"
+application_url = "https://smart-bundle-boost-eight.vercel.app"
 embedded = true
 
 [build]
 automatically_update_urls_on_dev = true
-dev_store_url = ""
+dev_store_url = "bundle-test-20220534.myshopify.com"
 
 [access_scopes]
 scopes = "write_products,read_orders,write_draft_orders,write_discounts"
 
 [auth]
 redirect_urls = [
-  "https://your-app.oxygen.dev/auth/callback",
-  "https://your-app.oxygen.dev/auth/shopify/callback"
+  "https://smart-bundle-boost-eight.vercel.app/auth/callback",
+  "https://smart-bundle-boost-eight.vercel.app/auth/shopify/callback"
 ]
 
 [webhooks]

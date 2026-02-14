@@ -1,5 +1,5 @@
 import "@shopify/polaris/build/esm/styles.css";
-import { json } from "@remix-run/node";
+import { json, redirect } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
 import {
   Page,
@@ -14,8 +14,6 @@ import {
 import { useState } from "react";
 import prisma from "~/db.server";
 
-const VERCEL_URL = "https://smart-bundle-boost-eight.vercel.app";
-
 const getShop = (request) => {
   const url = new URL(request.url);
   const s = url.searchParams.get("shop");
@@ -26,23 +24,7 @@ const getShop = (request) => {
   return "bundle-test-20220534.myshopify.com";
 };
 
-export const headers = () => ({
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
-});
-
 export const loader = async ({ request }) => {
-  if (request.method === "OPTIONS") {
-    return new Response(null, {
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
-      },
-    });
-  }
-
   const shop = getShop(request);
 
   let shopData = await prisma.shop.findUnique({
@@ -62,27 +44,13 @@ export const loader = async ({ request }) => {
     isFreePlan: shopData?.subscriptionStatus === "FREE" || !shopData?.subscriptionStatus,
     bundleCount: shopData?.bundles?.length || 0,
     shop,
-  }, {
-    headers: { "Access-Control-Allow-Origin": "*" },
   });
 };
 
 export const action = async ({ request }) => {
-  if (request.method === "OPTIONS") {
-    return new Response(null, {
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
-      },
-    });
-  }
-
   const formData = await request.formData();
   const actionType = formData.get("action");
-  const shop = formData.get("shop") || "bundle-test-20220534.myshopify.com";
-
-  const corsHeaders = { "Access-Control-Allow-Origin": "*" };
+  const shop = formData.get("shop") || getShop(request);
 
   let shopData = await prisma.shop.findUnique({
     where: { shopDomain: shop },
@@ -123,82 +91,14 @@ export const action = async ({ request }) => {
     });
   }
 
-  const updated = await prisma.shop.findUnique({
-    where: { shopDomain: shop },
-    include: { bundles: { orderBy: { createdAt: "desc" } } },
-  });
-
-  return json({
-    bundles: updated?.bundles || [],
-    isFreePlan: updated?.subscriptionStatus === "FREE" || !updated?.subscriptionStatus,
-    bundleCount: updated?.bundles?.length || 0,
-    shop,
-    success: true,
-  }, {
-    headers: corsHeaders,
-  });
+  return redirect(`/app/bundles?shop=${shop}`);
 };
 
 export default function Bundles() {
-  const loaderData = useLoaderData();
-  const [data, setData] = useState(loaderData);
+  const { bundles, isFreePlan, bundleCount, shop } = useLoaderData();
   const [showForm, setShowForm] = useState(false);
-  const [loading, setLoading] = useState(false);
 
-  const { bundles, isFreePlan, bundleCount, shop } = data;
   const canCreate = !isFreePlan || bundleCount < 1;
-
-  const submitAction = async (formData) => {
-    setLoading(true);
-    try {
-      const response = await fetch(`${VERCEL_URL}/app/bundles?shop=${shop}`, {
-        method: "POST",
-        body: formData,
-        headers: {
-          "Accept": "application/json",
-        },
-      });
-      const result = await response.json();
-      if (result.success) {
-        setData(result);
-        setShowForm(false);
-      } else {
-        alert("Erreur serveur");
-      }
-    } catch (e) {
-      alert("Erreur réseau: " + e.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleCreate = async (e) => {
-    e.preventDefault();
-    const form = e.target;
-    const formData = new FormData(form);
-    formData.append("action", "create");
-    formData.append("shop", shop);
-    await submitAction(formData);
-    form.reset();
-  };
-
-  const handleDelete = async (bundleId) => {
-    const formData = new FormData();
-    formData.append("action", "delete");
-    formData.append("shop", shop);
-    formData.append("bundleId", bundleId);
-    await submitAction(formData);
-  };
-
-  const handleToggle = async (bundleId, currentActive) => {
-    const formData = new FormData();
-    formData.append("action", "toggle");
-    formData.append("shop", shop);
-    formData.append("bundleId", bundleId);
-    formData.append("currentActive", String(currentActive));
-    await submitAction(formData);
-  };
-
   const resourceName = { singular: "bundle", plural: "bundles" };
 
   const rowMarkup = bundles.map((bundle, index) => (
@@ -217,20 +117,39 @@ export default function Bundles() {
         </Badge>
       </IndexTable.Cell>
       <IndexTable.Cell>
-        <button
-          onClick={() => handleToggle(bundle.id, bundle.active)}
-          style={{ background: "none", border: "none", cursor: "pointer", color: "#2c6ecb", fontSize: "14px" }}
+        <form
+          method="POST"
+          action={`https://smart-bundle-boost-eight.vercel.app/app/bundles?shop=${shop}`}
+          style={{ display: "inline" }}
         >
-          {bundle.active ? "Deactivate" : "Activate"}
-        </button>
+          <input type="hidden" name="action" value="toggle" />
+          <input type="hidden" name="bundleId" value={bundle.id} />
+          <input type="hidden" name="currentActive" value={String(bundle.active)} />
+          <input type="hidden" name="shop" value={shop} />
+          <button
+            type="submit"
+            style={{ background: "none", border: "none", cursor: "pointer", color: "#2c6ecb", fontSize: "14px" }}
+          >
+            {bundle.active ? "Deactivate" : "Activate"}
+          </button>
+        </form>
       </IndexTable.Cell>
       <IndexTable.Cell>
-        <button
-          onClick={() => handleDelete(bundle.id)}
-          style={{ background: "none", border: "none", cursor: "pointer", color: "#d72c0d", fontSize: "14px" }}
+        <form
+          method="POST"
+          action={`https://smart-bundle-boost-eight.vercel.app/app/bundles?shop=${shop}`}
+          style={{ display: "inline" }}
         >
-          Delete
-        </button>
+          <input type="hidden" name="action" value="delete" />
+          <input type="hidden" name="bundleId" value={bundle.id} />
+          <input type="hidden" name="shop" value={shop} />
+          <button
+            type="submit"
+            style={{ background: "none", border: "none", cursor: "pointer", color: "#d72c0d", fontSize: "14px" }}
+          >
+            Delete
+          </button>
+        </form>
       </IndexTable.Cell>
     </IndexTable.Row>
   ));
@@ -260,7 +179,12 @@ export default function Bundles() {
             <Card>
               <BlockStack gap="400">
                 <Text as="h2" variant="headingMd">Create New Bundle</Text>
-                <form onSubmit={handleCreate}>
+                <form
+                  method="POST"
+                  action={`https://smart-bundle-boost-eight.vercel.app/app/bundles?shop=${shop}`}
+                >
+                  <input type="hidden" name="action" value="create" />
+                  <input type="hidden" name="shop" value={shop} />
                   <BlockStack gap="300">
                     <div>
                       <label style={{ display: "block", marginBottom: "4px", fontSize: "14px", fontWeight: "500" }}>
@@ -324,19 +248,18 @@ export default function Bundles() {
 
                     <button
                       type="submit"
-                      disabled={loading}
                       style={{
-                        backgroundColor: loading ? "#ccc" : "#008060",
+                        backgroundColor: "#008060",
                         color: "white",
                         border: "none",
                         padding: "10px 20px",
                         borderRadius: "6px",
-                        cursor: loading ? "not-allowed" : "pointer",
+                        cursor: "pointer",
                         fontSize: "14px",
                         fontWeight: "600",
                       }}
                     >
-                      {loading ? "Saving..." : "Save Bundle"}
+                      Save Bundle
                     </button>
                   </BlockStack>
                 </form>
