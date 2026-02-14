@@ -41,7 +41,6 @@ export const loader = async ({ request }) => {
 
   return json({
     bundles: shopData?.bundles || [],
-    isFreePlan: shopData?.subscriptionStatus === "FREE" || !shopData?.subscriptionStatus,
     bundleCount: shopData?.bundles?.length || 0,
     shop,
   });
@@ -95,10 +94,9 @@ export const action = async ({ request }) => {
 };
 
 export default function Bundles() {
-  const { bundles, isFreePlan, bundleCount, shop } = useLoaderData();
+  const { bundles, bundleCount, shop } = useLoaderData();
   const [showForm, setShowForm] = useState(false);
 
-  const canCreate = !isFreePlan || bundleCount < 1;
   const resourceName = { singular: "bundle", plural: "bundles" };
 
   const rowMarkup = bundles.map((bundle, index) => (
@@ -158,23 +156,13 @@ export default function Bundles() {
     <Page
       title="Manage Bundles"
       backAction={{ url: "/app" }}
-      primaryAction={
-        canCreate
-          ? { content: showForm ? "Cancel" : "New Bundle", onAction: () => setShowForm(!showForm) }
-          : undefined
-      }
+      primaryAction={{
+        content: showForm ? "Cancel" : "New Bundle",
+        onAction: () => setShowForm(!showForm),
+      }}
     >
       <Layout>
-        {!canCreate && (
-          <Layout.Section>
-            <Banner tone="warning">
-              Free plan limit reached (1 bundle max).{" "}
-              <a href="/app/billing" style={{ color: "#2c6ecb" }}>Upgrade to Premium</a>
-            </Banner>
-          </Layout.Section>
-        )}
-
-        {showForm && canCreate && (
+        {showForm && (
           <Layout.Section>
             <Card>
               <BlockStack gap="400">
