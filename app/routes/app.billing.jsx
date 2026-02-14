@@ -1,24 +1,22 @@
 import "@shopify/polaris/build/esm/styles.css";
 import { json, redirect } from "@remix-run/node";
-import { useLoaderData, useFetcher } from "@remix-run/react";
+import { useLoaderData } from "@remix-run/react";
 import {
   Page,
   Layout,
   Card,
-  Button,
-  BlockStack,
   Text,
+  BlockStack,
   Banner,
   List,
   Badge,
 } from "@shopify/polaris";
-import { useEffect } from "react";
 import { authenticate } from "~/shopify.server";
 import prisma from "~/db.server";
 
 export const loader = async ({ request }) => {
-  const url = new URL(request.url);
-  const shop = url.searchParams.get("shop") || "demo-store.myshopify.com";
+  const { session } = await authenticate.admin(request);
+  const shop = session.shop;
 
   const shopData = await prisma.shop.findUnique({
     where: { shopDomain: shop },
@@ -27,68 +25,45 @@ export const loader = async ({ request }) => {
   return json({
     shop,
     subscriptionStatus: shopData?.subscriptionStatus || "FREE",
-    planName: shopData?.planName || null,
   });
 };
 
 export const action = async ({ request }) => {
-  try {
-    const { billing, session } = await authenticate.admin(request);
+  const { billing, session } = await authenticate.admin(request);
+  const shop = session.shop;
 
-    const billingCheck = await billing.require({
-      plans: ["Premium Plan"],
-      isTest: false,
-      onFailure: async () =>
-        billing.request({
-          plan: "Premium Plan",
-          isTest: false,
-          amount: 9.99,
-          currencyCode: "USD",
-          interval: "EVERY_30_DAYS",
-          trialDays: 7,
-        }),
-    });
+  await billing.require({
+    plans: ["Premium Plan"],
+    isTest: false,
+    onFailure: async () =>
+      billing.request({
+        plan: "Premium Plan",
+        isTest: false,
+        amount: 9.99,
+        currencyCode: "USD",
+        interval: "EVERY_30_DAYS",
+        trialDays: 7,
+      }),
+  });
 
-    if (billingCheck.appSubscriptions.length > 0) {
-      const url = new URL(request.url);
-      const shop = url.searchParams.get("shop") || session.shop;
+  await prisma.shop.upsert({
+    where: { shopDomain: shop },
+    update: { subscriptionStatus: "ACTIVE", planName: "Premium Plan" },
+    create: {
+      shopDomain: shop,
+      accessToken: session.accessToken || "",
+      scope: "",
+      subscriptionStatus: "ACTIVE",
+      planName: "Premium Plan",
+    },
+  });
 
-      await prisma.shop.upsert({
-        where: { shopDomain: shop },
-        update: { subscriptionStatus: "ACTIVE", planName: "Premium Plan" },
-        create: {
-          shopDomain: shop,
-          accessToken: session.accessToken || "",
-          scope: "",
-          subscriptionStatus: "ACTIVE",
-          planName: "Premium Plan",
-        },
-      });
-
-      return redirect(`/app?shop=${shop}`);
-    }
-
-    return json({ confirmationUrl: billingCheck.confirmationUrl });
-  } catch (error) {
-    console.error("Billing error:", error);
-    return json({ error: error.message }, { status: 500 });
-  }
+  return redirect(`/app?shop=${shop}`);
 };
 
 export default function Billing() {
   const { shop, subscriptionStatus } = useLoaderData();
-  const fetcher = useFetcher();
   const isPremium = subscriptionStatus === "ACTIVE";
-
-  useEffect(() => {
-    if (fetcher.data?.confirmationUrl) {
-      window.open(fetcher.data.confirmationUrl, "_top");
-    }
-  }, [fetcher.data]);
-
-  const handleUpgrade = () => {
-    fetcher.submit({}, { method: "post", action: `/app/billing?shop=${shop}` });
-  };
 
   return (
     <Page title="Billing" backAction={{ url: "/app" }}>
@@ -108,7 +83,6 @@ export default function Billing() {
         <Layout.Section>
           <Card>
             <BlockStack gap="500">
-
               <BlockStack gap="300">
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <Text as="h2" variant="headingMd">Free Plan</Text>
@@ -138,18 +112,30 @@ export default function Billing() {
                   <Text variant="headingLg">$9.99/month</Text>
 
                   {!isPremium && (
-                    <Button
-                      variant="primary"
-                      size="large"
-                      onClick={handleUpgrade}
-                      loading={fetcher.state === "submitting"}
+                    <form
+                      method="POST"
+                      action={`https://smart-bundle-boost-eight.vercel.app/app/billing?shop=${shop}`}
                     >
-                      Start 7-Day Free Trial
-                    </Button>
+                      <button
+                        type="submit"
+                        style={{
+                          backgroundColor: "#008060",
+                          color: "white",
+                          border: "none",
+                          padding: "12px 24px",
+                          borderRadius: "6px",
+                          cursor: "pointer",
+                          fontSize: "16px",
+                          fontWeight: "600",
+                          width: "100%",
+                        }}
+                      >
+                        Start 7-Day Free Trial
+                      </button>
+                    </form>
                   )}
                 </BlockStack>
               </div>
-
             </BlockStack>
           </Card>
         </Layout.Section>
