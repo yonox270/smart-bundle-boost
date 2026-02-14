@@ -77,12 +77,19 @@ export const action = async ({ request }) => {
       },
     });
 
-    // Crée la remise Shopify automatiquement
-    if (shopData.accessToken) {
+    // Récupère le token depuis la table Session
+    const session = await prisma.session.findFirst({
+      where: { shop: shop },
+    });
+
+    console.log("Session found:", session ? "yes" : "no");
+    console.log("Access token:", session?.accessToken ? "present" : "missing");
+
+    if (session?.accessToken) {
       try {
         const discountAmount = discountType === "PERCENTAGE"
           ? { percentage: discountValue / 100 }
-          : { amount: { amount: discountValue, currencyCode: "USD" } };
+          : { amount: { amount: String(discountValue), currencyCode: "USD" } };
 
         const mutation = `
           mutation CreateDiscount($input: DiscountAutomaticBasicInput!) {
@@ -120,14 +127,14 @@ export const action = async ({ request }) => {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              "X-Shopify-Access-Token": shopData.accessToken,
+              "X-Shopify-Access-Token": session.accessToken,
             },
             body: JSON.stringify({ query: mutation, variables }),
           }
         );
 
         const data = await response.json();
-        console.log("Discount created:", JSON.stringify(data));
+        console.log("Discount result:", JSON.stringify(data));
       } catch (e) {
         console.error("Discount creation failed:", e);
       }
