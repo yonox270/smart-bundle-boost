@@ -13,7 +13,7 @@ import {
   Select,
   FormLayout,
 } from "@shopify/polaris";
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import prisma from "~/db.server";
 
 const API_URL = "https://smart-bundle-boost-eight.vercel.app/api/bundles";
@@ -57,16 +57,17 @@ export default function Bundles() {
   const [discountType, setDiscountType] = useState("PERCENTAGE");
   const [loading, setLoading] = useState(false);
   const [localBundles, setLocalBundles] = useState(bundles);
+  
+  const titleRef = useRef(null);
+  const discountValueRef = useRef(null);
 
   const canCreate = !isFreePlan || bundleCount < 1;
 
   const handleCreate = async () => {
-    const titleEl = document.getElementById("bundleTitle");
-    const discountValueEl = document.getElementById("bundleDiscountValue");
-    const currentTitle = titleEl ? titleEl.value : "";
-    const currentDiscountValue = discountValueEl ? discountValueEl.value : "10";
+    const currentTitle = titleRef.current ? titleRef.current.value : "";
+    const currentDiscountValue = discountValueRef.current ? discountValueRef.current.value : "10";
 
-    alert("Title: '" + currentTitle + "'");
+    alert("Title: '" + currentTitle + "' | Shop: '" + shop + "'");
 
     if (!currentTitle.trim()) {
       alert("Titre vide !");
@@ -222,7 +223,7 @@ export default function Bundles() {
                       Bundle Title
                     </label>
                     <input
-                      id="bundleTitle"
+                      ref={titleRef}
                       type="text"
                       placeholder="e.g., Summer Bundle"
                       style={{
@@ -251,7 +252,7 @@ export default function Bundles() {
                       {discountType === "PERCENTAGE" ? "Discount %" : "Discount Amount $"}
                     </label>
                     <input
-                      id="bundleDiscountValue"
+                      ref={discountValueRef}
                       type="number"
                       defaultValue="10"
                       min="0"
