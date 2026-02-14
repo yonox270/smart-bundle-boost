@@ -8,7 +8,6 @@ import {
   Text,
   BlockStack,
   Badge,
-  Banner,
   IndexTable,
 } from "@shopify/polaris";
 import { useState } from "react";
@@ -67,6 +66,7 @@ export const action = async ({ request }) => {
     const title = formData.get("title");
     const discountType = formData.get("discountType");
     const discountValue = parseFloat(formData.get("discountValue"));
+
     await prisma.bundle.create({
       data: {
         shopId: shopData.id,
@@ -76,6 +76,62 @@ export const action = async ({ request }) => {
         productIds: [],
       },
     });
+
+    // Crée la remise Shopify automatiquement
+    if (shopData.accessToken) {
+      try {
+        const discountAmount = discountType === "PERCENTAGE"
+          ? { percentage: discountValue / 100 }
+          : { amount: { amount: discountValue, currencyCode: "USD" } };
+
+        const mutation = `
+          mutation CreateDiscount($input: DiscountAutomaticBasicInput!) {
+            discountAutomaticBasicCreate(automaticBasicDiscount: $input) {
+              automaticDiscountNode {
+                id
+              }
+              userErrors {
+                field
+                message
+              }
+            }
+          }
+        `;
+
+        const variables = {
+          input: {
+            title: `Bundle: ${title}`,
+            startsAt: new Date().toISOString(),
+            minimumRequirement: {
+              quantity: {
+                greaterThanOrEqualToQuantity: "2",
+              },
+            },
+            customerGets: {
+              value: discountAmount,
+              items: { all: true },
+            },
+          },
+        };
+
+        const response = await fetch(
+          `https://${shop}/admin/api/2024-01/graphql.json`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Shopify-Access-Token": shopData.accessToken,
+            },
+            body: JSON.stringify({ query: mutation, variables }),
+          }
+        );
+
+        const data = await response.json();
+        console.log("Discount created:", JSON.stringify(data));
+      } catch (e) {
+        console.error("Discount creation failed:", e);
+      }
+    }
   }
 
   if (actionType === "delete") {
@@ -94,7 +150,7 @@ export const action = async ({ request }) => {
 };
 
 export default function Bundles() {
-  const { bundles, bundleCount, shop } = useLoaderData();
+  const { bundles, shop } = useLoaderData();
   const [showForm, setShowForm] = useState(false);
 
   const resourceName = { singular: "bundle", plural: "bundles" };

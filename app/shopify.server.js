@@ -36,11 +36,28 @@ const shopify = shopifyApp({
     },
   },
   hooks: {
-    afterAuth: async ({ session }) => {
-      shopify.registerWebhooks({ session });
-      console.log(`✅ Shop ${session.shop} installed`);
-    },
+  afterAuth: async ({ session }) => {
+    shopify.registerWebhooks({ session });
+    console.log(`✅ Shop ${session.shop} installed`);
+    try {
+      await prisma.shop.upsert({
+        where: { shopDomain: session.shop },
+        update: {
+          accessToken: session.accessToken,
+          scope: session.scope || "",
+        },
+        create: {
+          shopDomain: session.shop,
+          accessToken: session.accessToken,
+          scope: session.scope || "",
+        },
+      });
+      console.log(`✅ Shop ${session.shop} saved to DB`);
+    } catch (error) {
+      console.error("❌ Error saving shop:", error);
+    }
   },
+},
   future: {
     v3_webhookAdminContext: true,
     v3_authenticatePublic: true,
