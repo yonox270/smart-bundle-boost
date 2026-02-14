@@ -59,6 +59,11 @@ export default function Index() {
                   View Analytics
                 </Button>
               </InlineStack>
+              {!canCreateMoreBundles && (
+                <Text tone="critical">
+                  Free plan limit reached. Upgrade to create more.
+                </Text>
+              )}
             </BlockStack>
           </Card>
         </Layout.Section>
