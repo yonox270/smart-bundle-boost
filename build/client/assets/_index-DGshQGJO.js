@@ -1,1 +1,0 @@
-import{j as e}from"./jsx-runtime-BMrMXMSG.js";function r(){return e.jsxs("html",{children:[e.jsxs("head",{children:[e.jsx("title",{children:"Smart Bundle Boost"}),e.jsx("meta",{httpEquiv:"refresh",content:"0; url=/app"})]}),e.jsx("body",{children:e.jsx("p",{children:"Redirecting to app..."})})]})}export{r as default};
