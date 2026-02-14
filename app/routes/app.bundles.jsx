@@ -1,6 +1,6 @@
 import "@shopify/polaris/build/esm/styles.css";
 import { json, redirect } from "@remix-run/node";
-import { useLoaderData, Form } from "@remix-run/react";
+import { useLoaderData, useFetcher } from "@remix-run/react";
 import {
   Page,
   Layout,
@@ -14,46 +14,20 @@ import {
   TextField,
   FormLayout,
 } from "@shopify/polaris";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import prisma from "~/db.server";
 
 const getShop = (request, formData = null) => {
-  // 1. Depuis le formulaire
   if (formData) {
-    const shopFromForm = formData.get("shop");
-    if (shopFromForm && shopFromForm !== "demo-store.myshopify.com") {
-      return shopFromForm;
-    }
+    const s = formData.get("shop");
+    if (s && s !== "demo-store.myshopify.com") return s;
   }
-
-  // 2. Depuis l'URL
   const url = new URL(request.url);
-  const shopFromUrl = url.searchParams.get("shop");
-  if (shopFromUrl) return shopFromUrl;
-
-  // 3. Depuis les cookies
-  const cookieHeader = request.headers.get("Cookie") || "";
-  const cookies = Object.fromEntries(
-    cookieHeader.split(";")
-      .map(c => c.trim())
-      .filter(c => c.includes("="))
-      .map(c => {
-        const [key, ...val] = c.split("=");
-        return [key.trim(), val.join("=").trim()];
-      })
-  );
-  if (cookies["shop"] && cookies["shop"] !== "demo-store.myshopify.com") {
-    return cookies["shop"];
-  }
-
-  // 4. Depuis le referer
-  const referer = request.headers.get("referer") || "";
-  try {
-    const refererUrl = new URL(referer);
-    const shopFromReferer = refererUrl.searchParams.get("shop");
-    if (shopFromReferer) return shopFromReferer;
-  } catch (e) {}
-
+  const s = url.searchParams.get("shop");
+  if (s) return s;
+  const cookie = request.headers.get("Cookie") || "";
+  const match = cookie.match(/shop=([^;]+)/);
+  if (match) return decodeURIComponent(match[1]);
   return "demo-store.myshopify.com";
 };
 
@@ -67,11 +41,7 @@ export const loader = async ({ request }) => {
 
   if (!shopData) {
     shopData = await prisma.shop.create({
-      data: {
-        shopDomain: shop,
-        accessToken: "",
-        scope: "",
-      },
+      data: { shopDomain: shop, accessToken: "", scope: "" },
       include: { bundles: true },
     });
   }
@@ -104,13 +74,11 @@ export const action = async ({ request }) => {
   if (actionType === "create") {
     const isFreePlan = shopData?.subscriptionStatus === "FREE" || !shopData?.subscriptionStatus;
     if (isFreePlan && shopData.bundles.length >= 1) {
-      return json({ error: "Free plan limit reached" }, { status: 400 });
+      return json({ error: "Free plan limit reached" });
     }
-
     const title = formData.get("title");
     const discountType = formData.get("discountType");
     const discountValue = parseFloat(formData.get("discountValue"));
-
     await prisma.bundle.create({
       data: {
         shopId: shopData.id,
@@ -120,14 +88,13 @@ export const action = async ({ request }) => {
         productIds: [],
       },
     });
-
-    return redirect(`/app/bundles?shop=${shop}`);
+    return json({ success: true, action: "created" });
   }
 
   if (actionType === "delete") {
     const bundleId = formData.get("bundleId");
     await prisma.bundle.delete({ where: { id: bundleId } });
-    return redirect(`/app/bundles?shop=${shop}`);
+    return json({ success: true, action: "deleted" });
   }
 
   if (actionType === "toggle") {
@@ -137,20 +104,60 @@ export const action = async ({ request }) => {
       where: { id: bundleId },
       data: { active: !currentActive },
     });
-    return redirect(`/app/bundles?shop=${shop}`);
+    return json({ success: true, action: "toggled" });
   }
 
   return json({ success: true });
 };
 
 export default function Bundles() {
-  const { bundles, isFreePlan, bundleCount, shop } = useLoaderData();
+  const { bundles: initialBundles, isFreePlan, bundleCount, shop } = useLoaderData();
+  const fetcher = useFetcher();
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState("");
   const [discountType, setDiscountType] = useState("PERCENTAGE");
   const [discountValue, setDiscountValue] = useState("10");
+  const [bundles, setBundles] = useState(initialBundles);
+
+  // Recharge les bundles après chaque action
+  useEffect(() => {
+    if (fetcher.data?.success) {
+      setShowForm(false);
+      setTitle("");
+      setDiscountValue("10");
+      // Recharge la page pour voir les nouveaux bundles
+      window.location.reload();
+    }
+  }, [fetcher.data]);
 
   const canCreate = !isFreePlan || bundleCount < 1;
+
+  const handleCreate = () => {
+    const formData = new FormData();
+    formData.append("action", "create");
+    formData.append("shop", shop);
+    formData.append("title", title);
+    formData.append("discountType", discountType);
+    formData.append("discountValue", discountValue);
+    fetcher.submit(formData, { method: "post" });
+  };
+
+  const handleDelete = (bundleId) => {
+    const formData = new FormData();
+    formData.append("action", "delete");
+    formData.append("shop", shop);
+    formData.append("bundleId", bundleId);
+    fetcher.submit(formData, { method: "post" });
+  };
+
+  const handleToggle = (bundleId, currentActive) => {
+    const formData = new FormData();
+    formData.append("action", "toggle");
+    formData.append("shop", shop);
+    formData.append("bundleId", bundleId);
+    formData.append("currentActive", String(currentActive));
+    fetcher.submit(formData, { method: "post" });
+  };
 
   const resourceName = { singular: "bundle", plural: "bundles" };
 
@@ -170,43 +177,20 @@ export default function Bundles() {
         </Badge>
       </IndexTable.Cell>
       <IndexTable.Cell>
-        <Form method="post">
-          <input type="hidden" name="action" value="toggle" />
-          <input type="hidden" name="bundleId" value={bundle.id} />
-          <input type="hidden" name="currentActive" value={String(bundle.active)} />
-          <input type="hidden" name="shop" value={shop} />
-          <button
-            type="submit"
-            style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              color: "#2c6ecb",
-              fontSize: "14px",
-            }}
-          >
-            {bundle.active ? "Deactivate" : "Activate"}
-          </button>
-        </Form>
+        <button
+          onClick={() => handleToggle(bundle.id, bundle.active)}
+          style={{ background: "none", border: "none", cursor: "pointer", color: "#2c6ecb", fontSize: "14px" }}
+        >
+          {bundle.active ? "Deactivate" : "Activate"}
+        </button>
       </IndexTable.Cell>
       <IndexTable.Cell>
-        <Form method="post">
-          <input type="hidden" name="action" value="delete" />
-          <input type="hidden" name="bundleId" value={bundle.id} />
-          <input type="hidden" name="shop" value={shop} />
-          <button
-            type="submit"
-            style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              color: "#d72c0d",
-              fontSize: "14px",
-            }}
-          >
-            Delete
-          </button>
-        </Form>
+        <button
+          onClick={() => handleDelete(bundle.id)}
+          style={{ background: "none", border: "none", cursor: "pointer", color: "#d72c0d", fontSize: "14px" }}
+        >
+          Delete
+        </button>
       </IndexTable.Cell>
     </IndexTable.Row>
   ));
@@ -245,59 +229,49 @@ export default function Bundles() {
             <Card>
               <BlockStack gap="400">
                 <Text as="h2" variant="headingMd">Create New Bundle</Text>
-                <Form method="post">
-                  <input type="hidden" name="action" value="create" />
-                  <input type="hidden" name="shop" value={shop} />
-                  <FormLayout>
-                    <TextField
-                      label="Bundle Title"
-                      name="title"
-                      value={title}
-                      onChange={setTitle}
-                      autoComplete="off"
-                      placeholder="e.g., Summer Bundle"
-                    />
-                    <Select
-                      label="Discount Type"
-                      name="discountType"
-                      options={[
-                        { label: "Percentage (%)", value: "PERCENTAGE" },
-                        { label: "Fixed Amount ($)", value: "FIXED_AMOUNT" },
-                      ]}
-                      value={discountType}
-                      onChange={setDiscountType}
-                    />
-                    <TextField
-                      label={
-                        discountType === "PERCENTAGE"
-                          ? "Discount %"
-                          : "Discount Amount $"
-                      }
-                      name="discountValue"
-                      value={discountValue}
-                      onChange={setDiscountValue}
-                      type="number"
-                      autoComplete="off"
-                      min="0"
-                      max={discountType === "PERCENTAGE" ? "100" : undefined}
-                    />
-                    <button
-                      type="submit"
-                      style={{
-                        backgroundColor: "#008060",
-                        color: "white",
-                        border: "none",
-                        padding: "10px 20px",
-                        borderRadius: "6px",
-                        cursor: "pointer",
-                        fontSize: "14px",
-                        fontWeight: "600",
-                      }}
-                    >
-                      Save Bundle
-                    </button>
-                  </FormLayout>
-                </Form>
+                <FormLayout>
+                  <TextField
+                    label="Bundle Title"
+                    value={title}
+                    onChange={setTitle}
+                    autoComplete="off"
+                    placeholder="e.g., Summer Bundle"
+                  />
+                  <Select
+                    label="Discount Type"
+                    options={[
+                      { label: "Percentage (%)", value: "PERCENTAGE" },
+                      { label: "Fixed Amount ($)", value: "FIXED_AMOUNT" },
+                    ]}
+                    value={discountType}
+                    onChange={setDiscountType}
+                  />
+                  <TextField
+                    label={discountType === "PERCENTAGE" ? "Discount %" : "Discount Amount $"}
+                    value={discountValue}
+                    onChange={setDiscountValue}
+                    type="number"
+                    autoComplete="off"
+                    min="0"
+                    max={discountType === "PERCENTAGE" ? "100" : undefined}
+                  />
+                  <button
+                    onClick={handleCreate}
+                    disabled={fetcher.state === "submitting"}
+                    style={{
+                      backgroundColor: fetcher.state === "submitting" ? "#ccc" : "#008060",
+                      color: "white",
+                      border: "none",
+                      padding: "10px 20px",
+                      borderRadius: "6px",
+                      cursor: fetcher.state === "submitting" ? "not-allowed" : "pointer",
+                      fontSize: "14px",
+                      fontWeight: "600",
+                    }}
+                  >
+                    {fetcher.state === "submitting" ? "Saving..." : "Save Bundle"}
+                  </button>
+                </FormLayout>
               </BlockStack>
             </Card>
           </Layout.Section>
