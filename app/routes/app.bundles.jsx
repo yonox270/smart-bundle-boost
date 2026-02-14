@@ -1,6 +1,6 @@
 import "@shopify/polaris/build/esm/styles.css";
-import { json, redirect } from "@remix-run/node";
-import { useLoaderData, useFetcher } from "@remix-run/react";
+import { json } from "@remix-run/node";
+import { useLoaderData } from "@remix-run/react";
 import {
   Page,
   Layout,
@@ -14,21 +14,19 @@ import {
   TextField,
   FormLayout,
 } from "@shopify/polaris";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import prisma from "~/db.server";
 
-const getShop = (request, formData = null) => {
-  if (formData) {
-    const s = formData.get("shop");
-    if (s && s !== "demo-store.myshopify.com") return s;
-  }
+const API_URL = "https://smart-bundle-boost-eight.vercel.app/api/bundles";
+
+const getShop = (request) => {
   const url = new URL(request.url);
   const s = url.searchParams.get("shop");
   if (s) return s;
   const cookie = request.headers.get("Cookie") || "";
   const match = cookie.match(/shop=([^;]+)/);
   if (match) return decodeURIComponent(match[1]);
-  return "demo-store.myshopify.com";
+  return "bundle-test-20220534.myshopify.com";
 };
 
 export const loader = async ({ request }) => {
@@ -54,114 +52,93 @@ export const loader = async ({ request }) => {
   });
 };
 
-export const action = async ({ request }) => {
-  const formData = await request.formData();
-  const actionType = formData.get("action");
-  const shop = getShop(request, formData);
-
-  let shopData = await prisma.shop.findUnique({
-    where: { shopDomain: shop },
-    include: { bundles: true },
-  });
-
-  if (!shopData) {
-    shopData = await prisma.shop.create({
-      data: { shopDomain: shop, accessToken: "", scope: "" },
-      include: { bundles: true },
-    });
-  }
-
-  if (actionType === "create") {
-    const isFreePlan = shopData?.subscriptionStatus === "FREE" || !shopData?.subscriptionStatus;
-    if (isFreePlan && shopData.bundles.length >= 1) {
-      return json({ error: "Free plan limit reached" });
-    }
-    const title = formData.get("title");
-    const discountType = formData.get("discountType");
-    const discountValue = parseFloat(formData.get("discountValue"));
-    await prisma.bundle.create({
-      data: {
-        shopId: shopData.id,
-        title,
-        discountType,
-        discountValue,
-        productIds: [],
-      },
-    });
-    return json({ success: true, action: "created" });
-  }
-
-  if (actionType === "delete") {
-    const bundleId = formData.get("bundleId");
-    await prisma.bundle.delete({ where: { id: bundleId } });
-    return json({ success: true, action: "deleted" });
-  }
-
-  if (actionType === "toggle") {
-    const bundleId = formData.get("bundleId");
-    const currentActive = formData.get("currentActive") === "true";
-    await prisma.bundle.update({
-      where: { id: bundleId },
-      data: { active: !currentActive },
-    });
-    return json({ success: true, action: "toggled" });
-  }
-
-  return json({ success: true });
-};
-
 export default function Bundles() {
-  const { bundles: initialBundles, isFreePlan, bundleCount, shop } = useLoaderData();
-  const fetcher = useFetcher();
+  const { bundles, isFreePlan, bundleCount, shop } = useLoaderData();
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState("");
   const [discountType, setDiscountType] = useState("PERCENTAGE");
   const [discountValue, setDiscountValue] = useState("10");
-  const [bundles, setBundles] = useState(initialBundles);
-
-  // Recharge les bundles après chaque action
-  useEffect(() => {
-    if (fetcher.data?.success) {
-      setShowForm(false);
-      setTitle("");
-      setDiscountValue("10");
-      // Recharge la page pour voir les nouveaux bundles
-      window.location.reload();
-    }
-  }, [fetcher.data]);
+  const [loading, setLoading] = useState(false);
+  const [localBundles, setLocalBundles] = useState(bundles);
 
   const canCreate = !isFreePlan || bundleCount < 1;
 
-  const handleCreate = () => {
-    const formData = new FormData();
-    formData.append("action", "create");
-    formData.append("shop", shop);
-    formData.append("title", title);
-    formData.append("discountType", discountType);
-    formData.append("discountValue", discountValue);
-    fetcher.submit(formData, { method: "post" });
+  const handleCreate = async () => {
+    if (!title) {
+      alert("Titre vide !");
+      return;
+    }
+    setLoading(true);
+    alert("Envoi vers: " + API_URL + " | shop: " + shop);
+    try {
+      const response = await fetch(API_URL, {
+        method: "POST",
+        body: new URLSearchParams({
+          action: "create",
+          shop: shop,
+          title: title,
+          discountType: discountType,
+          discountValue: discountValue,
+        }),
+      });
+      alert("Status reçu: " + response.status);
+      const data = await response.json();
+      alert("Réponse: " + JSON.stringify(data));
+      if (data.success) {
+        setShowForm(false);
+        setTitle("");
+        setDiscountValue("10");
+        window.location.reload();
+      }
+    } catch (e) {
+      alert("ERREUR CATCH: " + e.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleDelete = (bundleId) => {
-    const formData = new FormData();
-    formData.append("action", "delete");
-    formData.append("shop", shop);
-    formData.append("bundleId", bundleId);
-    fetcher.submit(formData, { method: "post" });
+  const handleDelete = async (bundleId) => {
+    setLoading(true);
+    try {
+      await fetch(API_URL, {
+        method: "POST",
+        body: new URLSearchParams({
+          action: "delete",
+          shop: shop,
+          bundleId: bundleId,
+        }),
+      });
+      window.location.reload();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleToggle = (bundleId, currentActive) => {
-    const formData = new FormData();
-    formData.append("action", "toggle");
-    formData.append("shop", shop);
-    formData.append("bundleId", bundleId);
-    formData.append("currentActive", String(currentActive));
-    fetcher.submit(formData, { method: "post" });
+  const handleToggle = async (bundleId, currentActive) => {
+    setLoading(true);
+    try {
+      await fetch(API_URL, {
+        method: "POST",
+        body: new URLSearchParams({
+          action: "toggle",
+          shop: shop,
+          bundleId: bundleId,
+          currentActive: String(currentActive),
+        }),
+      });
+      window.location.reload();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const resourceName = { singular: "bundle", plural: "bundles" };
 
-  const rowMarkup = bundles.map((bundle, index) => (
+  const rowMarkup = localBundles.map((bundle, index) => (
     <IndexTable.Row id={bundle.id} key={bundle.id} position={index}>
       <IndexTable.Cell>
         <Text variant="bodyMd" fontWeight="bold">{bundle.title}</Text>
@@ -179,7 +156,13 @@ export default function Bundles() {
       <IndexTable.Cell>
         <button
           onClick={() => handleToggle(bundle.id, bundle.active)}
-          style={{ background: "none", border: "none", cursor: "pointer", color: "#2c6ecb", fontSize: "14px" }}
+          style={{
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            color: "#2c6ecb",
+            fontSize: "14px",
+          }}
         >
           {bundle.active ? "Deactivate" : "Activate"}
         </button>
@@ -187,7 +170,13 @@ export default function Bundles() {
       <IndexTable.Cell>
         <button
           onClick={() => handleDelete(bundle.id)}
-          style={{ background: "none", border: "none", cursor: "pointer", color: "#d72c0d", fontSize: "14px" }}
+          style={{
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            color: "#d72c0d",
+            fontSize: "14px",
+          }}
         >
           Delete
         </button>
@@ -247,7 +236,11 @@ export default function Bundles() {
                     onChange={setDiscountType}
                   />
                   <TextField
-                    label={discountType === "PERCENTAGE" ? "Discount %" : "Discount Amount $"}
+                    label={
+                      discountType === "PERCENTAGE"
+                        ? "Discount %"
+                        : "Discount Amount $"
+                    }
                     value={discountValue}
                     onChange={setDiscountValue}
                     type="number"
@@ -257,19 +250,19 @@ export default function Bundles() {
                   />
                   <button
                     onClick={handleCreate}
-                    disabled={fetcher.state === "submitting"}
+                    disabled={loading}
                     style={{
-                      backgroundColor: fetcher.state === "submitting" ? "#ccc" : "#008060",
+                      backgroundColor: loading ? "#ccc" : "#008060",
                       color: "white",
                       border: "none",
                       padding: "10px 20px",
                       borderRadius: "6px",
-                      cursor: fetcher.state === "submitting" ? "not-allowed" : "pointer",
+                      cursor: loading ? "not-allowed" : "pointer",
                       fontSize: "14px",
                       fontWeight: "600",
                     }}
                   >
-                    {fetcher.state === "submitting" ? "Saving..." : "Save Bundle"}
+                    {loading ? "Saving..." : "Save Bundle"}
                   </button>
                 </FormLayout>
               </BlockStack>
@@ -281,7 +274,7 @@ export default function Bundles() {
           <Card padding="0">
             <IndexTable
               resourceName={resourceName}
-              itemCount={bundles.length}
+              itemCount={localBundles.length}
               headings={[
                 { title: "Title" },
                 { title: "Discount" },
