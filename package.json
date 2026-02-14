@@ -4,11 +4,10 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "build": "remix vite:build",
-    "dev": "shopify app dev",
-    "start": "remix-serve ./build/server/index.js",
-    "typecheck": "tsc"
-  },
+  "build": "prisma generate && remix vite:build",
+  "dev": "shopify app dev",
+  "start": "remix-serve ./build/server/index.js"
+},
   "dependencies": {
     "@prisma/client": "^5.22.0",
     "@shopify/polaris": "^12.0.0",
