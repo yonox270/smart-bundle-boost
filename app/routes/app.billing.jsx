@@ -15,8 +15,8 @@ import { authenticate } from "~/shopify.server";
 import prisma from "~/db.server";
 
 export const loader = async ({ request }) => {
-  const { session } = await authenticate.admin(request);
-  const shop = session.shop;
+  const url = new URL(request.url);
+  const shop = url.searchParams.get("shop") || "bundle-test-20220534.myshopify.com";
 
   const shopData = await prisma.shop.findUnique({
     where: { shopDomain: shop },
@@ -32,33 +32,38 @@ export const action = async ({ request }) => {
   const { billing, session } = await authenticate.admin(request);
   const shop = session.shop;
 
-  await billing.require({
-    plans: ["Premium Plan"],
-    isTest: false,
-    onFailure: async () =>
-      billing.request({
-        plan: "Premium Plan",
-        isTest: false,
-        amount: 9.99,
-        currencyCode: "USD",
-        interval: "EVERY_30_DAYS",
-        trialDays: 7,
-      }),
-  });
+  try {
+    const billingCheck = await billing.require({
+      plans: ["Premium Plan"],
+      isTest: false,
+      onFailure: async () =>
+        billing.request({
+          plan: "Premium Plan",
+          isTest: false,
+          amount: 9.99,
+          currencyCode: "USD",
+          interval: "EVERY_30_DAYS",
+          trialDays: 7,
+        }),
+    });
 
-  await prisma.shop.upsert({
-    where: { shopDomain: shop },
-    update: { subscriptionStatus: "ACTIVE", planName: "Premium Plan" },
-    create: {
-      shopDomain: shop,
-      accessToken: session.accessToken || "",
-      scope: "",
-      subscriptionStatus: "ACTIVE",
-      planName: "Premium Plan",
-    },
-  });
+    await prisma.shop.upsert({
+      where: { shopDomain: shop },
+      update: { subscriptionStatus: "ACTIVE", planName: "Premium Plan" },
+      create: {
+        shopDomain: shop,
+        accessToken: session.accessToken || "",
+        scope: "",
+        subscriptionStatus: "ACTIVE",
+        planName: "Premium Plan",
+      },
+    });
 
-  return redirect(`/app?shop=${shop}`);
+    return redirect(`/app?shop=${shop}`);
+  } catch (error) {
+    console.error("Billing error:", error);
+    return json({ error: error.message }, { status: 500 });
+  }
 };
 
 export default function Billing() {
@@ -116,6 +121,7 @@ export default function Billing() {
                       method="POST"
                       action={`https://smart-bundle-boost-eight.vercel.app/app/billing?shop=${shop}`}
                     >
+                      <input type="hidden" name="shop" value={shop} />
                       <button
                         type="submit"
                         style={{
