@@ -14,13 +14,19 @@ import {
 
 export const loader = async ({ request }) => {
   const url = new URL(request.url);
-  const shop = url.searchParams.get("shop") || "demo-store.myshopify.com";
+  const shop = url.searchParams.get("shop") || 
+               request.headers.get("x-shopify-shop-domain") || 
+               "demo-store.myshopify.com";
 
   return json({
     shop,
     bundleCount: 0,
     isFreePlan: true,
     canCreateMoreBundles: true,
+  }, {
+    headers: {
+      "Set-Cookie": `shop=${shop}; Path=/; SameSite=None; Secure`,
+    }
   });
 };
 

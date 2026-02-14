@@ -17,20 +17,48 @@ import {
 import { useState } from "react";
 import prisma from "~/db.server";
 
-export const loader = async ({ request }) => {
-  const url = new URL(request.url);
-  let shop = url.searchParams.get("shop");
-
-  // Récupère le shop depuis le referer si pas dans l'URL
-  if (!shop) {
-    const referer = request.headers.get("referer") || "";
-    try {
-      const refererUrl = new URL(referer);
-      shop = refererUrl.searchParams.get("shop");
-    } catch (e) {}
+const getShop = (request, formData = null) => {
+  // 1. Depuis le formulaire
+  if (formData) {
+    const shopFromForm = formData.get("shop");
+    if (shopFromForm && shopFromForm !== "demo-store.myshopify.com") {
+      return shopFromForm;
+    }
   }
 
-  shop = shop || "demo-store.myshopify.com";
+  // 2. Depuis l'URL
+  const url = new URL(request.url);
+  const shopFromUrl = url.searchParams.get("shop");
+  if (shopFromUrl) return shopFromUrl;
+
+  // 3. Depuis les cookies
+  const cookieHeader = request.headers.get("Cookie") || "";
+  const cookies = Object.fromEntries(
+    cookieHeader.split(";")
+      .map(c => c.trim())
+      .filter(c => c.includes("="))
+      .map(c => {
+        const [key, ...val] = c.split("=");
+        return [key.trim(), val.join("=").trim()];
+      })
+  );
+  if (cookies["shop"] && cookies["shop"] !== "demo-store.myshopify.com") {
+    return cookies["shop"];
+  }
+
+  // 4. Depuis le referer
+  const referer = request.headers.get("referer") || "";
+  try {
+    const refererUrl = new URL(referer);
+    const shopFromReferer = refererUrl.searchParams.get("shop");
+    if (shopFromReferer) return shopFromReferer;
+  } catch (e) {}
+
+  return "demo-store.myshopify.com";
+};
+
+export const loader = async ({ request }) => {
+  const shop = getShop(request);
 
   let shopData = await prisma.shop.findUnique({
     where: { shopDomain: shop },
@@ -59,21 +87,7 @@ export const loader = async ({ request }) => {
 export const action = async ({ request }) => {
   const formData = await request.formData();
   const actionType = formData.get("action");
-
-  // Récupère le shop depuis le formulaire, l'URL, ou le referer
-  let shop = formData.get("shop");
-
-  if (!shop || shop === "demo-store.myshopify.com") {
-    try {
-      const referer = request.headers.get("referer") || "";
-      const refererUrl = new URL(referer.startsWith("http") ? referer : "https://placeholder.com");
-      shop = refererUrl.searchParams.get("shop");
-    } catch (e) {}
-  }
-
-  if (!shop || shop === "demo-store.myshopify.com") {
-    shop = new URL(request.url).searchParams.get("shop") || "demo-store.myshopify.com";
-  }
+  const shop = getShop(request, formData);
 
   let shopData = await prisma.shop.findUnique({
     where: { shopDomain: shop },
@@ -161,7 +175,16 @@ export default function Bundles() {
           <input type="hidden" name="bundleId" value={bundle.id} />
           <input type="hidden" name="currentActive" value={String(bundle.active)} />
           <input type="hidden" name="shop" value={shop} />
-          <button type="submit" style={{ background: "none", border: "none", cursor: "pointer", color: "#2c6ecb", fontSize: "14px" }}>
+          <button
+            type="submit"
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color: "#2c6ecb",
+              fontSize: "14px",
+            }}
+          >
             {bundle.active ? "Deactivate" : "Activate"}
           </button>
         </Form>
@@ -171,7 +194,16 @@ export default function Bundles() {
           <input type="hidden" name="action" value="delete" />
           <input type="hidden" name="bundleId" value={bundle.id} />
           <input type="hidden" name="shop" value={shop} />
-          <button type="submit" style={{ background: "none", border: "none", cursor: "pointer", color: "#d72c0d", fontSize: "14px" }}>
+          <button
+            type="submit"
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color: "#d72c0d",
+              fontSize: "14px",
+            }}
+          >
             Delete
           </button>
         </Form>
@@ -236,7 +268,11 @@ export default function Bundles() {
                       onChange={setDiscountType}
                     />
                     <TextField
-                      label={discountType === "PERCENTAGE" ? "Discount %" : "Discount Amount $"}
+                      label={
+                        discountType === "PERCENTAGE"
+                          ? "Discount %"
+                          : "Discount Amount $"
+                      }
                       name="discountValue"
                       value={discountValue}
                       onChange={setDiscountValue}
