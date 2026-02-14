@@ -1,5 +1,5 @@
 {
   "installCommand": "npm ci",
-  "buildCommand": "npx prisma generate && npx vite build",
+  "buildCommand": "npm run build",
   "framework": null
 }
