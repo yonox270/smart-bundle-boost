@@ -14,6 +14,8 @@ import {
 import { useState } from "react";
 import prisma from "~/db.server";
 
+const VERCEL_URL = "https://smart-bundle-boost-eight.vercel.app";
+
 const getShop = (request) => {
   const url = new URL(request.url);
   const s = url.searchParams.get("shop");
@@ -91,7 +93,6 @@ export const action = async ({ request }) => {
     });
   }
 
-  // Recharge les bundles
   const updated = await prisma.shop.findUnique({
     where: { shopDomain: shop },
     include: { bundles: { orderBy: { createdAt: "desc" } } },
@@ -118,11 +119,12 @@ export default function Bundles() {
   const submitAction = async (formData) => {
     setLoading(true);
     try {
-      const response = await fetch(window.location.href, {
+      const response = await fetch(`${VERCEL_URL}/app/bundles?shop=${shop}`, {
         method: "POST",
         body: formData,
       });
       const result = await response.json();
+      alert("Résultat: " + JSON.stringify(result));
       if (result.success) {
         setData(result);
         setShowForm(false);
