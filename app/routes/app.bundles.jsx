@@ -26,7 +26,23 @@ const getShop = (request) => {
   return "bundle-test-20220534.myshopify.com";
 };
 
+export const headers = () => ({
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+});
+
 export const loader = async ({ request }) => {
+  if (request.method === "OPTIONS") {
+    return new Response(null, {
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+      },
+    });
+  }
+
   const shop = getShop(request);
 
   let shopData = await prisma.shop.findUnique({
@@ -46,13 +62,27 @@ export const loader = async ({ request }) => {
     isFreePlan: shopData?.subscriptionStatus === "FREE" || !shopData?.subscriptionStatus,
     bundleCount: shopData?.bundles?.length || 0,
     shop,
+  }, {
+    headers: { "Access-Control-Allow-Origin": "*" },
   });
 };
 
 export const action = async ({ request }) => {
+  if (request.method === "OPTIONS") {
+    return new Response(null, {
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+      },
+    });
+  }
+
   const formData = await request.formData();
   const actionType = formData.get("action");
   const shop = formData.get("shop") || "bundle-test-20220534.myshopify.com";
+
+  const corsHeaders = { "Access-Control-Allow-Origin": "*" };
 
   let shopData = await prisma.shop.findUnique({
     where: { shopDomain: shop },
@@ -104,6 +134,8 @@ export const action = async ({ request }) => {
     bundleCount: updated?.bundles?.length || 0,
     shop,
     success: true,
+  }, {
+    headers: corsHeaders,
   });
 };
 
@@ -122,15 +154,19 @@ export default function Bundles() {
       const response = await fetch(`${VERCEL_URL}/app/bundles?shop=${shop}`, {
         method: "POST",
         body: formData,
+        headers: {
+          "Accept": "application/json",
+        },
       });
       const result = await response.json();
-      alert("Résultat: " + JSON.stringify(result));
       if (result.success) {
         setData(result);
         setShowForm(false);
+      } else {
+        alert("Erreur serveur");
       }
     } catch (e) {
-      alert("Erreur: " + e.message);
+      alert("Erreur réseau: " + e.message);
     } finally {
       setLoading(false);
     }
