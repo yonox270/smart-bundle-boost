@@ -19,7 +19,18 @@ import prisma from "~/db.server";
 
 export const loader = async ({ request }) => {
   const url = new URL(request.url);
-  const shop = url.searchParams.get("shop") || "demo-store.myshopify.com";
+  let shop = url.searchParams.get("shop");
+
+  // Récupère le shop depuis le referer si pas dans l'URL
+  if (!shop) {
+    const referer = request.headers.get("referer") || "";
+    try {
+      const refererUrl = new URL(referer);
+      shop = refererUrl.searchParams.get("shop");
+    } catch (e) {}
+  }
+
+  shop = shop || "demo-store.myshopify.com";
 
   let shopData = await prisma.shop.findUnique({
     where: { shopDomain: shop },
@@ -48,7 +59,21 @@ export const loader = async ({ request }) => {
 export const action = async ({ request }) => {
   const formData = await request.formData();
   const actionType = formData.get("action");
-  const shop = formData.get("shop") || new URL(request.url).searchParams.get("shop") || "demo-store.myshopify.com";
+
+  // Récupère le shop depuis le formulaire, l'URL, ou le referer
+  let shop = formData.get("shop");
+
+  if (!shop || shop === "demo-store.myshopify.com") {
+    try {
+      const referer = request.headers.get("referer") || "";
+      const refererUrl = new URL(referer.startsWith("http") ? referer : "https://placeholder.com");
+      shop = refererUrl.searchParams.get("shop");
+    } catch (e) {}
+  }
+
+  if (!shop || shop === "demo-store.myshopify.com") {
+    shop = new URL(request.url).searchParams.get("shop") || "demo-store.myshopify.com";
+  }
 
   let shopData = await prisma.shop.findUnique({
     where: { shopDomain: shop },
