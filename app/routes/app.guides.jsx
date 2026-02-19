@@ -1,19 +1,8 @@
 import "@shopify/polaris/build/esm/styles.css";
 import { json } from "@remix-run/node";
-import { useLoaderData } from "@remix-run/react";
-import {
-  Page,
-  Layout,
-  Card,
-  Text,
-  BlockStack,
-  InlineStack,
-  Badge,
-} from "@shopify/polaris";
-import { authenticate } from "~/shopify.server";
+import { Page, Layout, Card, Text, BlockStack, InlineStack, Badge, Box } from "@shopify/polaris";
 
 export const loader = async ({ request }) => {
-  await authenticate.admin(request);
   return json({ ok: true });
 };
 

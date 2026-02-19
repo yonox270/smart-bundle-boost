@@ -60,6 +60,8 @@ export const loader = async ({ request }) => {
   );
 
   const productsData = await productsRes.json();
+  console.log("API Response:", JSON.stringify(productsData, null, 2));
+
   const products = productsData.data?.products?.edges || [];
   const shopName = productsData.data?.shop?.name || shop.split('.')[0];
 
