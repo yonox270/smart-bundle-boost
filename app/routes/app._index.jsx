@@ -13,38 +13,55 @@ import {
   Button,
   Box,
 } from "@shopify/polaris";
-import { authenticate } from "~/shopify.server";
+import prisma from "~/db.server";
 
 export const loader = async ({ request }) => {
-  const { admin, session } = await authenticate.admin(request);
-  const shop = session.shop;
+  const url = new URL(request.url);
+  const shop = url.searchParams.get("shop") || "bundle-test-20220534.myshopify.com";
+  
+  // Récupère le token depuis la DB
+  const shopData = await prisma.shop.findUnique({
+    where: { shopDomain: shop },
+  });
 
-  const productsRes = await admin.graphql(`
-    query {
-      products(first: 250) {
-        edges {
-          node {
-            id
-            title
-            description
-            images(first: 1) { edges { node { id } } }
+  if (!shopData?.accessToken) {
+    return json({ error: "No access token" }, { status: 401 });
+  }
+
+  // Appelle l'API Shopify directement avec le token
+  const productsRes = await fetch(
+    `https://${shop}/admin/api/2024-01/graphql.json`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Shopify-Access-Token": shopData.accessToken,
+      },
+      body: JSON.stringify({
+        query: `
+          query {
+            products(first: 250) {
+              edges {
+                node {
+                  id
+                  title
+                  description
+                  images(first: 1) { edges { node { id } } }
+                }
+              }
+            }
+            shop {
+              name
+            }
           }
-        }
-      }
+        `,
+      }),
     }
-  `);
+  );
+
   const productsData = await productsRes.json();
   const products = productsData.data?.products?.edges || [];
-
-  const shopRes = await admin.graphql(`
-    query {
-      shop {
-        name
-      }
-    }
-  `);
-  const shopData = await shopRes.json();
-  const shopName = shopData.data?.shop?.name || shop;
+  const shopName = productsData.data?.shop?.name || shop.split('.')[0];
 
   const totalProducts = products.length;
   const productsWithImages = products.filter(p => p.node.images.edges.length > 0).length;
@@ -72,11 +89,26 @@ export const loader = async ({ request }) => {
     { id: 5, task: "Ajouter une page de contact", done: false, priority: "medium" },
   ];
 
-  return json({ shop, shopName, totalScore, totalProducts, productsWithImages, productsWithDesc, checklist });
+  return json({
+    shop,
+    shopName,
+    totalScore,
+    totalProducts,
+    productsWithImages,
+    productsWithDesc,
+    checklist,
+  });
 };
 
 export default function Dashboard() {
-  const { shopName, totalScore, totalProducts, productsWithImages, productsWithDesc, checklist } = useLoaderData();
+  const {
+    shopName,
+    totalScore,
+    totalProducts,
+    productsWithImages,
+    productsWithDesc,
+    checklist,
+  } = useLoaderData();
 
   const scoreColor = totalScore >= 70 ? "success" : totalScore >= 40 ? "warning" : "critical";
   const doneTasks = checklist.filter(t => t.done).length;
@@ -93,8 +125,10 @@ export default function Dashboard() {
               </InlineStack>
               <ProgressBar progress={totalScore} tone={scoreColor} />
               <Text tone="subdued">
-                {totalScore >= 70 ? "🎉 Excellente boutique ! Continuez comme ça."
-                  : totalScore >= 40 ? "👍 Bonne base, mais il reste des améliorations importantes."
+                {totalScore >= 70
+                  ? "🎉 Excellente boutique ! Continuez comme ça."
+                  : totalScore >= 40
+                  ? "👍 Bonne base, mais il reste des améliorations importantes."
                   : "⚠️ Votre boutique a besoin d'améliorations urgentes."}
               </Text>
             </BlockStack>
@@ -108,7 +142,9 @@ export default function Dashboard() {
                 <BlockStack gap="200">
                   <Text variant="headingSm" tone="subdued">Produits</Text>
                   <Text variant="headingXl">{totalProducts}</Text>
-                  <Text tone="subdued">{totalProducts >= 10 ? "✅ Suffisant" : "❌ Ajoutez plus de produits"}</Text>
+                  <Text tone="subdued">
+                    {totalProducts >= 10 ? "✅ Suffisant" : "❌ Ajoutez plus de produits"}
+                  </Text>
                 </BlockStack>
               </Card>
             </Box>
@@ -117,7 +153,9 @@ export default function Dashboard() {
                 <BlockStack gap="200">
                   <Text variant="headingSm" tone="subdued">Avec images</Text>
                   <Text variant="headingXl">{productsWithImages}/{totalProducts}</Text>
-                  <Text tone="subdued">{totalProducts > 0 && productsWithImages === totalProducts ? "✅ Complet" : "❌ Manque des images"}</Text>
+                  <Text tone="subdued">
+                    {totalProducts > 0 && productsWithImages === totalProducts ? "✅ Complet" : "❌ Manque des images"}
+                  </Text>
                 </BlockStack>
               </Card>
             </Box>
@@ -126,7 +164,9 @@ export default function Dashboard() {
                 <BlockStack gap="200">
                   <Text variant="headingSm" tone="subdued">Avec descriptions</Text>
                   <Text variant="headingXl">{productsWithDesc}/{totalProducts}</Text>
-                  <Text tone="subdued">{totalProducts > 0 && productsWithDesc === totalProducts ? "✅ Complet" : "❌ Manque des descriptions"}</Text>
+                  <Text tone="subdued">
+                    {totalProducts > 0 && productsWithDesc === totalProducts ? "✅ Complet" : "❌ Manque des descriptions"}
+                  </Text>
                 </BlockStack>
               </Card>
             </Box>
