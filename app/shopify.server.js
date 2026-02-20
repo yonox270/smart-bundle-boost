@@ -33,7 +33,15 @@ const shopify = shopifyApp({
   },
   hooks: {
     afterAuth: async ({ session }) => {
+      console.log("AfterAuth Debug:", {
+        shop: session.shop,
+        scope: session.scope,
+        envScopes: process.env.SCOPES,
+        finalScope: session.scope || process.env.SCOPES || "EMPTY"
+      });
+      
       shopify.registerWebhooks({ session });
+      
       await prisma.shop.upsert({
         where: { shopDomain: session.shop },
         update: { 
@@ -46,7 +54,8 @@ const shopify = shopifyApp({
           scope: session.scope || process.env.SCOPES || "" 
         },
       });
-      console.log(`StoreScore: ${session.shop} installed with scope: ${session.scope || process.env.SCOPES}`);
+      
+      console.log(`StoreScore: ${session.shop} installed`);
     },
   },
   future: {
