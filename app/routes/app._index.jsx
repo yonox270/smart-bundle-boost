@@ -19,14 +19,17 @@ export const loader = async ({ request }) => {
   const url = new URL(request.url);
   const shop = url.searchParams.get("shop") || "bundle-test-20220534.myshopify.com";
   
-  // Récupère le token depuis la DB
-  const shopData = await prisma.shop.findUnique({
-    where: { shopDomain: shop },
+  // Récupère le token depuis la Session table
+  const sessionData = await prisma.session.findFirst({
+    where: { shop: shop },
+    orderBy: { id: 'desc' }
   });
 
-  if (!shopData?.accessToken) {
+  if (!sessionData?.accessToken) {
     return json({ error: "No access token" }, { status: 401 });
   }
+
+  const shopData = { accessToken: sessionData.accessToken };
 
   // Appelle l'API Shopify directement avec le token
   const productsRes = await fetch(
