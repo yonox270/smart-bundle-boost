@@ -36,16 +36,23 @@ const shopify = shopifyApp({
       shopify.registerWebhooks({ session });
       await prisma.shop.upsert({
         where: { shopDomain: session.shop },
-        update: { accessToken: session.accessToken, scope: session.scope || "" },
-        create: { shopDomain: session.shop, accessToken: session.accessToken, scope: session.scope || "" },
+        update: { 
+          accessToken: session.accessToken, 
+          scope: session.scope || process.env.SCOPES || "" 
+        },
+        create: { 
+          shopDomain: session.shop, 
+          accessToken: session.accessToken, 
+          scope: session.scope || process.env.SCOPES || "" 
+        },
       });
-      console.log(`StoreScore: ${session.shop} installed`);
+      console.log(`StoreScore: ${session.shop} installed with scope: ${session.scope || process.env.SCOPES}`);
     },
   },
   future: {
-  v3_webhookAdminContext: true,
-  v3_authenticatePublic: true,
-},
+    v3_webhookAdminContext: true,
+    v3_authenticatePublic: true,
+  },
 });
 
 export default shopify;
